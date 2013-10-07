@@ -69,11 +69,12 @@ var ContextFieldValueRecord = Ext.data.Record.create([
 ]);
 
 var contextFieldStore = new Ext.data.JsonStore({
-  url: '/metrics/find/',
+  url: '/dashlist/findDB/',
   root: 'metrics',
   idProperty: 'name',
   fields: ContextFieldValueRecord,
-  baseParams: {format: 'completer', wildcards: '1'}
+  baseParams: {format: 'completer', wildcards: '1'},
+  query: 'MT-'
 });
 
 
@@ -117,7 +118,6 @@ if (sessionDefaultParamsJson && sessionDefaultParamsJson.length > 0) {
 
 
 function initDashboard () {
-
   // Populate naming-scheme based datastructures
   Ext.each(schemes, function (scheme_info) {
     scheme_info.id = scheme_info.name;
@@ -287,22 +287,20 @@ function initDashboard () {
       }),
       store: new Ext.data.JsonStore({
         method: 'GET',
-        url: '/metrics/find/',
+        url: '/dashlist/findDB/',
         autoLoad: true,
-        baseParams: {
-          query: '',
-          format: 'completer',
-          automatic_variants: (UI_CONFIG.automatic_variants) ? '1' : '0'
-        },
-        fields: ['path', 'is_leaf'],
-        root: 'metrics'
+	query: 'MT',
+	fields: ['path', 'is_leaf'],
+	root: 'metrics',
       }),
       listeners: {
         rowclick: function (thisGrid, rowIndex, e) {
                     var record = thisGrid.getStore().getAt(rowIndex);
+		    //Ext.Msg.alert("Error", "urlparts = " + dName );
                     if (record.data['is_leaf'] == '1') {
-                      graphAreaToggle(record.data.path);
-                      thisGrid.getView().refresh();
+		      var dashName=record.data.path.replace(/\./g,'-');
+		      sendLoadRequest(dashName);
+		      navBar.collapse();
                     } else {
                       metricSelectorTextField.setValue(record.data.path);
                     }
@@ -340,7 +338,7 @@ function initDashboard () {
   }
 
   var autocompleteTask = new Ext.util.DelayedTask(function () {
-    var query = metricSelectorTextField.getValue();
+    var query = metricSelectorTextField.getValue().replace(/\./g,"-");
     var store = metricSelectorGrid.getStore();
     store.setBaseParam('query', query);
     store.load();
@@ -719,7 +717,7 @@ function initDashboard () {
   if (initialError) {
     Ext.Msg.alert("Error", initialError);
   }
-navBar.collapse();
+//navBar.collapse();
 }
 
 function showHelp() {
@@ -860,10 +858,11 @@ function metricTreeSelectorShow(pattern) {
   }
 
   var loader = new Ext.tree.TreeLoader({
-    url: '/metrics/find/',
+    url: '/dashlist/findDB/',
     requestMethod: 'GET',
     listeners: {beforeload: setParams}
   });
+  //Ext.Msg.alert("Error", "At function metricTreeSelectorShow -- after var loader" + loader );
 
   try {
     var oldRoot = Ext.getCmp('rootMetricSelectorNode');
@@ -2351,16 +2350,16 @@ function setDashboardName(name) {
   var saveButton = Ext.getCmp('dashboard-save-button');
 
   if (name == null) { 
-    dashboardURL = null;
+    dashboardL = null;
     document.title = "untitled - Graphite Dashboard";
     navBar.setTitle("untitled");
     saveButton.setText("Save");
     saveButton.disable();
   } else {
     var urlparts = location.href.split('#')[0].split('/');
-    var i = urlparts.indexOf('dashboard');
+    var i = urlparts.indexOf('dashlist');
     if (i == -1) {
-      Ext.Msg.alert("Error", "urlparts = " + Ext.encode(urlparts) + " and indexOf(dashboard) = " + i);
+      //Ext.Msg.alert("Error", "urlparts = " + Ext.encode(urlparts) + " and indexOf(dashboard) = " + i);
       return;
     }
     urlparts = urlparts.slice(0, i+1);
@@ -2371,11 +2370,11 @@ function setDashboardName(name) {
     window.location.hash = name;
     navBar.setTitle(name + " - (" + dashboardURL + ")");
     if (name.substring(0,2) == MasterTemplate) {
-	saveButton.setText("Save");
-	saveButton.disable();
+        saveButton.setText("Save");
+        saveButton.disable();
     } else {
-    	saveButton.setText('Save "' + name + '"');
-    	saveButton.enable();
+        saveButton.setText('Save "' + name + '"');
+        saveButton.enable();
     }
   }
 }

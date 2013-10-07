@@ -34,17 +34,18 @@ GRAPHITE_ROOT = dirname(WEBAPP_DIR)
 THIRDPARTY_DIR = join(WEB_DIR,'thirdparty')
 # Initialize additional path variables
 # Defaults for these are set after local_settings is imported
-CONTENT_DIR = ''
-CSS_DIR = ''
-CONF_DIR = ''
+CONTENT_DIR = '/usr/share/graphite/webapp/content/'
+CSS_DIR = CONTENT_DIR + 'css/'
+CONF_DIR = '/etc/graphite-web/'
 DASHBOARD_CONF = ''
 GRAPHTEMPLATES_CONF = ''
-STORAGE_DIR = ''
+STORAGE_DIR = '/var/lib/graphite-web/'
 WHITELIST_FILE = ''
 INDEX_FILE = ''
-LOG_DIR = ''
-WHISPER_DIR = ''
-RRD_DIR = ''
+LOG_DIR = '/var/log/graphite-web/'
+CARBON_DIR = '/var/lib/carbon/'
+WHISPER_DIR = CARBON_DIR + 'whisper/'
+RRD_DIR = CARBON_DIR + 'rrd/'
 DATA_DIRS = []
 
 CLUSTER_SERVERS = []
