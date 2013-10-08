@@ -749,7 +749,16 @@ function initDashboard () {
   if (initialError) {
     Ext.Msg.alert("Error", initialError);
   }
-//navBar.collapse();
+  if (initialState) {
+    applyState(initialState);
+    navBar.collapse();
+  }
+  //If the URL already has a dashboard name, then collapse the bar
+  var urlparts = location.href;
+  var i = urlparts.indexOf('#');
+  if (i != -1) {
+     navBar.collapse();
+  }
 }
 
 function showHelp() {
