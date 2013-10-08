@@ -1722,7 +1722,8 @@ function graphClicked(graphView, graphIndex, element, evt) {
   var rowHeight = 21;
   var maxRows = 6;
   var frameHeight = 5;
-  var gridWidth = (buttonWidth * 3) + 2;
+  var numSlots = record.data.params.detailLink != undefined && record.data.params.detailLink != '' ? 4 : 3;
+  var gridWidth = (buttonWidth * numSlots) + 2;
   var gridHeight = (rowHeight * Math.min(targets.length, maxRows)) + frameHeight;
 
   targetGrid = new Ext.grid.EditorGridPanel({
@@ -1811,6 +1812,18 @@ function graphClicked(graphView, graphIndex, element, evt) {
     }, {
       xtype: 'button',
       fieldLabel: "<span style='visibility: hidden'>",
+      text: 'Show Raw Data',
+      width: 100,
+      handler: function () { menu.destroy(); window.open(record.data.url + '&rawData=true&format=html'); }
+    }, {
+      xtype: 'button',
+      fieldLabel: "<span style='visibility: hidden'>",
+      text: 'Save Raw Data',
+      width: 100,
+      handler: function () { menu.destroy(); self.location = record.data.url + '&rawData=true&format=csv'; }
+    }, {
+      xtype: 'button',
+      fieldLabel: "<span style='visibility: hidden'>",
       text: "Direct URL",
       width: 100,
       handler: function () {
@@ -1880,6 +1893,18 @@ function graphClicked(graphView, graphIndex, element, evt) {
              }
   });
 
+  if (numSlots == 4) { 
+        buttons.push({
+          xtype: 'button',
+          text: "Details",
+          width: buttonWidth,
+          handler: function (thisButton) {
+                     menu.destroy();
+                     window.open(record.data.params.detailLink);
+                   }    
+        });  
+  }
+  
   menuItems.push({
     xtype: 'panel',
     layout: 'hbox',

@@ -1,0 +1,20 @@
+<html>
+  <head>
+    <title>Raw Data</title>
+    <link rel="stylesheet" type="text/css" href="/content/css/table.css" />
+  </head>
+  <body>
+	{% for series in series_data %}
+	   <br>
+	    <h3>Data for metric: {{series.name}}</h3>
+	    <table class="styledtable" border="1">
+	    {% for datapoint in series.datapoints %}
+	        <tr>
+	        <td>{{datapoint.time}}</td>
+	        <td>{{datapoint.value}}</td>
+	        </tr>
+	    {% endfor %}
+	    </table>
+	{% endfor %}
+  </body>
+</html>

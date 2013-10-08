@@ -159,6 +159,18 @@ def renderView(request):
       log.rendering('Total pickle rendering time %.6f' % (time() - start))
       return response
 
+    if format == 'html':
+      series_data = []
+      for series in data:
+        datapoints = []
+        for i, value in enumerate(series):
+          timestamp = localtime( series.start + (i * series.step) )
+          datapoints.append( dict(time=strftime("%Y-%m-%d %H:%M:%S", timestamp), value=value) )
+        series_data.append( dict(name=series.name, datapoints=datapoints) )
+          
+      template = loader.get_template('raw.html')
+      context = Context(dict(series_data=series_data))
+      return HttpResponse( template.render(context) )
 
   # We've got the data, now to render it
   graphOptions['data'] = data

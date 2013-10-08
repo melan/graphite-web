@@ -8,3 +8,6 @@ dropin.cache
 docs/_build
 *.log
 *.pyc
+.project
+.pydevproject
+storage
