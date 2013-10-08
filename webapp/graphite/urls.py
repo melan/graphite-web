@@ -27,12 +27,12 @@ urlpatterns = patterns('',
   ('^browser/?', include('graphite.browser.urls')),
   ('^account/?', include('graphite.account.urls')),
   ('^dashboard/?', include('graphite.dashboard.urls')),
-  ('^dashlist/?', include('graphite.dashlist.urls')),
   ('^whitelist/?', include('graphite.whitelist.urls')),
   ('^content/(?P<path>.*)$', 'django.views.static.serve', {'document_root' : settings.CONTENT_DIR}),
   ('graphlot/', include('graphite.graphlot.urls')),
   ('^version/', include('graphite.version.urls')),
   ('^events/', include('graphite.events.urls')),
+  ('^dashlist/', include('graphite.dashboard.urls')),
   ('', 'graphite.browser.views.browser'),
 )
 

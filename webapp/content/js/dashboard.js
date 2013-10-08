@@ -18,6 +18,8 @@ var refreshTask;
 var spacer;
 var justClosedGraph = false;
 var NOT_EDITABLE = ['from', 'until', 'width', 'height', 'target', 'uniq', '_uniq'];
+var dashNavigation = false;
+var varFindURL;
 
 var cookieProvider = new Ext.state.CookieProvider({
   path: "/dashboard"
@@ -26,6 +28,17 @@ var cookieProvider = new Ext.state.CookieProvider({
 var NAV_BAR_REGION = cookieProvider.get('navbar-region') || 'north';
 
 var CONFIRM_REMOVE_ALL = cookieProvider.get('confirm-remove-all') != 'false';
+
+/* Find if used is landing on dashlist (Navigator) or dashboard (Composer) */
+var urlLink = location.href;
+if (urlLink.indexOf("dashlist") !=-1) {
+   dashNavigation = true;
+}
+if (dashNavigation) {
+   varFindURL= "/dashboard/findDB/";
+} else {
+   varFindURL= "/metrics/find/";
+}  
 
 /* Nav Bar configuration */
 var navBarNorthConfig = {
@@ -68,12 +81,17 @@ var ContextFieldValueRecord = Ext.data.Record.create([
   {path: 'path'}
 ]);
 
+if (dashNavigation) {
+   varBaseParams= {format: 'completer', wildcards: '1', query: 'MT-'};
+} else {
+   varBaseParams= {format: 'completer', wildcards: '1'};
+}  
 var contextFieldStore = new Ext.data.JsonStore({
-  url: '/metrics/find/',
+  url: varFindURL,
   root: 'metrics',
   idProperty: 'name',
   fields: ContextFieldValueRecord,
-  baseParams: {format: 'completer', wildcards: '1'}
+  baseParams: varBaseParams
 });
 
 
@@ -117,7 +135,6 @@ if (sessionDefaultParamsJson && sessionDefaultParamsJson.length > 0) {
 
 
 function initDashboard () {
-
   // Populate naming-scheme based datastructures
   Ext.each(schemes, function (scheme_info) {
     scheme_info.id = scheme_info.name;
@@ -253,6 +270,12 @@ function initDashboard () {
     });
   } else { // NAV_BAR_REGION == 'north'
     metricSelectorMode = 'text';
+    if ( dashNavigation ) {
+	queryParams = { query: 'MT' };
+    } else {
+	queryParams = { query: '', format: 'completer', automatic_variants: (UI_CONFIG.automatic_variants) ? '1' : '0'};
+    }
+
     metricSelectorGrid = new Ext.grid.GridPanel({
       region: 'center',
       hideHeaders: true,
@@ -287,22 +310,25 @@ function initDashboard () {
       }),
       store: new Ext.data.JsonStore({
         method: 'GET',
-        url: '/metrics/find/',
+       	url: varFindURL,
         autoLoad: true,
-        baseParams: {
-          query: '',
-          format: 'completer',
-          automatic_variants: (UI_CONFIG.automatic_variants) ? '1' : '0'
-        },
-        fields: ['path', 'is_leaf'],
-        root: 'metrics'
+        baseParams: queryParams,
+	fields: ['path', 'is_leaf'],
+	root: 'metrics',
       }),
+
       listeners: {
         rowclick: function (thisGrid, rowIndex, e) {
                     var record = thisGrid.getStore().getAt(rowIndex);
                     if (record.data['is_leaf'] == '1') {
-                      graphAreaToggle(record.data.path);
-                      thisGrid.getView().refresh();
+		       if ( dashNavigation ) {
+		          var dashName=record.data.path.replace(/\./g,'-');
+		          sendLoadRequest(dashName);
+		          navBar.collapse();
+		       } else {
+                          graphAreaToggle(record.data.path);
+                          thisGrid.getView().refresh();
+		       }
                     } else {
                       metricSelectorTextField.setValue(record.data.path);
                     }
@@ -338,9 +364,10 @@ function initDashboard () {
       items: [metricSelectorGrid, metricSelectorTextField]
     });
   }
+ 
 
   var autocompleteTask = new Ext.util.DelayedTask(function () {
-    var query = metricSelectorTextField.getValue();
+    var query = dashNavigation ? metricSelectorTextField.getValue().replace(/\./g,"-") : metricSelectorTextField.getValue();
     var store = metricSelectorGrid.getStore();
     store.setBaseParam('query', query);
     store.load();
@@ -719,7 +746,7 @@ function initDashboard () {
   if (initialError) {
     Ext.Msg.alert("Error", initialError);
   }
-navBar.collapse();
+//navBar.collapse();
 }
 
 function showHelp() {
@@ -860,7 +887,7 @@ function metricTreeSelectorShow(pattern) {
   }
 
   var loader = new Ext.tree.TreeLoader({
-    url: '/metrics/find/',
+    url: varFindURL,
     requestMethod: 'GET',
     listeners: {beforeload: setParams}
   });
@@ -2288,21 +2315,57 @@ function getState() {
   };
 }
 
-function applyState(state) {
-  setDashboardName(state.name);
+function dateFromRelative(quantity, units)
+  {
+    result = new Date();
+    switch(units)
+    {
+      case "minutes":
+        result.setMinutes(result.getMinutes() - quantity);
+        break;
+      case "hours":
+        result.setHours(result.getHours() - quantity);
+        break;
+      case "days":
+        result.setDate(result.getDate() - quantity);
+        break;
+      case "weeks":
+        result.setDate(result.getDate() - (quantity * 7));
+        break;
+     case "months":
+        result.setMonth(result.getMonth() - quantity);
+        break;
+    }
+    return result;
+}
 
+
+function applyState(state) {
+  if (typeof(state) == "string") {
+    state = JSON.parse(state);
+  }
+  setDashboardName(state.name);
   //state.timeConfig = {type, quantity, units, untilQuantity, untilUnits, startDate, startTime, endDate, endTime}
   var timeConfig = state.timeConfig
-  TimeRange.type = timeConfig.type;
-  TimeRange.relativeStartQuantity = timeConfig.quantity;
-  TimeRange.relativeStartUnits = timeConfig.units;
-  TimeRange.relativeUntilQuantity = timeConfig.untilQuantity;
-  TimeRange.relativeUntilUnits = timeConfig.untilUnits;
-  TimeRange.startDate = new Date(timeConfig.startDate);
-  TimeRange.startTime = timeConfig.startTime;
-  TimeRange.endDate = new Date(timeConfig.endDate);
-  TimeRange.endTime = timeConfig.endTime;
-  updateTimeText();
+  if (timeConfig) {
+    TimeRange.type = timeConfig.type;
+    TimeRange.relativeStartQuantity = timeConfig.relativeStartQuantity;
+    TimeRange.relativeStartUnits = timeConfig.relativeStartUnits;
+    TimeRange.relativeUntilQuantity = timeConfig.relativeUntilQuantity;
+    TimeRange.relativeUntilUnits = timeConfig.relativeUntilUnits;
+    if (timeConfig.type == "relative") {
+      TimeRange.startDate = dateFromRelative(timeConfig.relativeStartQuantity, timeConfig.relativeStartUnits);
+      TimeRange.startTime = TimeRange.startDate.getHours() + ":00"
+      TimeRange.endDate = dateFromRelative(timeConfig.relativeUntilQuantity, timeConfig.relativeUntilUnits);
+      TimeRange.endTime = (TimeRange.endDate.getHours() + 2) + ":00"
+    } else {
+      TimeRange.startDate = new Date(timeConfig.startDate);
+      TimeRange.startTime = timeConfig.startTime;
+      TimeRange.endDate = new Date(timeConfig.endDate);
+      TimeRange.endTime = timeConfig.endTime;
+    }
+}
+updateTimeText();
 
   //state.refreshConfig = {enabled, interval}
   var refreshConfig = state.refreshConfig;
@@ -2360,7 +2423,7 @@ function setDashboardName(name) {
     var urlparts = location.href.split('#')[0].split('/');
     var i = urlparts.indexOf('dashboard');
     if (i == -1) {
-      Ext.Msg.alert("Error", "urlparts = " + Ext.encode(urlparts) + " and indexOf(dashboard) = " + i);
+      //Ext.Msg.alert("Error", "urlparts = " + Ext.encode(urlparts) + " and indexOf(dashboard) = " + i);
       return;
     }
     urlparts = urlparts.slice(0, i+1);
@@ -2371,11 +2434,11 @@ function setDashboardName(name) {
     window.location.hash = name;
     navBar.setTitle(name + " - (" + dashboardURL + ")");
     if (name.substring(0,2) == MasterTemplate) {
-	saveButton.setText("Save");
-	saveButton.disable();
+        saveButton.setText("Save");
+        saveButton.disable();
     } else {
-    	saveButton.setText('Save "' + name + '"');
-    	saveButton.enable();
+        saveButton.setText('Save "' + name + '"');
+        saveButton.enable();
     }
   }
 }

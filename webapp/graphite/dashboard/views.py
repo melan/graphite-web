@@ -11,6 +11,7 @@ from graphite.util import json
 from graphite.dashboard.models import Dashboard
 from graphite.render.views import renderView
 from send_graph import send_graph_email
+from operator import itemgetter
 
 
 fieldRegex = re.compile(r'<([^>]+)>')
@@ -176,7 +177,6 @@ def delete(request, name):
     dashboard.delete()
     return json_response( dict(success=True) )
 
-
 def find(request):
   query = request.REQUEST['query']
   query_terms = set( query.lower().split() )
@@ -200,6 +200,53 @@ def find(request):
       results.append( dict(name=dashboard.name) )
 
   return json_response( dict(dashboards=results) )
+
+
+def findDB(request):
+  query = request.REQUEST.get('query')
+  if not query:
+     query = 'MT-'
+  wildcards = int( request.REQUEST.get('wildcards', 0) )
+  query_terms =  query.lower().split()
+  results = []
+
+  # Find all dashboard names that contain each of our query terms as a substring
+  for dashboard in Dashboard.objects.all():
+    for term in query_terms:
+       #term=term.strip("-$")
+       name = dashboard.name.lower()
+       if name == term:
+         continue
+       if name.startswith(term):
+         OrigNameList=dashboard.name.replace('-','.').split('.')
+         nameList=name.replace('-','.').split('.')
+         nameListLength=len(nameList)
+         termList=term.strip("-$").replace('-','.').split('.')
+         termListLength=len(termList)
+         thisTermItem=termList[-1]
+         thisTermPosInNameList=nameList.index(thisTermItem)
+	 if nameListLength == termListLength+1:
+            is_leaf='1'
+            nextTermItem=OrigNameList[thisTermPosInNameList+1]
+            dataPath=query.strip("-$").replace('-','.')+'.'+nextTermItem
+         elif nameListLength == termListLength:
+            is_leaf='1'
+            nextTermItem=OrigNameList[thisTermPosInNameList]
+            #dataPath=query.replace('-','.')+'.'+nextTermItem
+            dataPath=query.replace('-','.')
+         else:
+            is_leaf='0'
+            nextTermItem=OrigNameList[thisTermPosInNameList+1]
+            dataPath=query.strip("-$").replace('-','.')+'.'+nextTermItem+'.'
+ 
+         if not dict(is_leaf=is_leaf, path=dataPath, name=nextTermItem) in results: 
+            results.append( dict(is_leaf=is_leaf, path=dataPath, name=nextTermItem) )
+
+  if len(results) > 1 and wildcards:
+      wildcardNode = {'name' : '*'}
+      results.append(wildcardNode)
+
+  return json_response( dict(metrics=sorted(results, key=itemgetter('name') ) ) )
 
 
 def help(request):
