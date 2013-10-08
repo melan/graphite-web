@@ -1164,7 +1164,7 @@ function createOptionsMenu() {
     xtype: 'menu',
     items: [
       menuInputItem("Graph Title", "title", "Graph Title", /^$/),
-      menuInputItem("Detail Link", "detailLink", "Detail Link", /[^#A-Za-z0-9_.]/),
+      menuInputItem("Detail Link", "detailLink", "Detail Link", /[^#A-Za-z0-9_\-.]/),
       {text: "Display", menu: displayMenu},
       {text: "Line Mode", menu: lineMenu},
       {text: "Area Mode", menu: areaMenu},
