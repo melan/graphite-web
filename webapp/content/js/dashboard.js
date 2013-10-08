@@ -20,6 +20,7 @@ var justClosedGraph = false;
 var NOT_EDITABLE = ['from', 'until', 'width', 'height', 'target', 'uniq', '_uniq'];
 var dashNavigation = false;
 var varFindURL;
+var URLname;
 
 var cookieProvider = new Ext.state.CookieProvider({
   path: "/dashboard"
@@ -36,8 +37,10 @@ if (urlLink.indexOf("dashlist") !=-1) {
 }
 if (dashNavigation) {
    varFindURL= "/dashboard/findDB/";
+   URLname="dashlist";
 } else {
    varFindURL= "/metrics/find/";
+   URLname="dashboard";
 }  
 
 /* Nav Bar configuration */
@@ -2446,7 +2449,7 @@ function setDashboardName(name) {
     saveButton.disable();
   } else {
     var urlparts = location.href.split('#')[0].split('/');
-    var i = urlparts.indexOf('dashboard');
+    var i = urlparts.indexOf(URLname);
     if (i == -1) {
       //Ext.Msg.alert("Error", "urlparts = " + Ext.encode(urlparts) + " and indexOf(dashboard) = " + i);
       return;
