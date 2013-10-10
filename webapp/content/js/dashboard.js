@@ -21,6 +21,9 @@ var NOT_EDITABLE = ['from', 'until', 'width', 'height', 'target', 'uniq', '_uniq
 var dashNavigation = false;
 var varFindURL;
 var URLname;
+var YMD_format = 'Ymd';
+var HM_format = 'H:i';
+var linkLocation;
 
 var cookieProvider = new Ext.state.CookieProvider({
   path: "/dashboard"
@@ -1121,7 +1124,7 @@ var TimeRange = {
 function getTimeText() {
   if (TimeRange.type == 'relative') {
     var text = "Now showing the past " + TimeRange.relativeStartQuantity + " " + TimeRange.relativeStartUnits;
-    if (TimeRange.relativeUntilUnits != 'now') {
+    if (TimeRange.relativeUntilUnits != 'now' && TimeRange.relativeUntilUnits != '') {
       text = text + " until " + TimeRange.relativeUntilQuantity + " " + TimeRange.relativeUntilUnits + " ago";
     }
     return text;
@@ -1131,32 +1134,50 @@ function getTimeText() {
   }
 }
 
-function updateTimeText() {
+function getQueryParams(qs) {
+  qs = qs.split("+").join(" ");
+
+  var params = {}, tokens, re = /[?&]?([^=]+)=([^&]*)/g;
+  while (tokens = re.exec(qs)) {
+    params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
+  }
+  return params;
+}
+
+function updateTimeText(timeParam) {
   graphArea.getTopToolbar().get('time-range-text').setText( getTimeText() );
+  var params = jQuery.extend(getQueryParams(self.location.search), {"from": timeParam.fromParam, "until": timeParam.untilParam});
+  linkLocation = self.location.protocol + "//" + self.location.host + self.location.pathname + "?" + jQuery.param(params) + self.location.hash;
+}
+
+function timeRangeForUrl() {
+  var timeParam = new Object();
+  if (TimeRange.type == 'relative') {
+    timeParam.fromParam = '-' + TimeRange.relativeStartQuantity + TimeRange.relativeStartUnits;
+    if (TimeRange.relativeUntilUnits == 'now' || TimeRange.relativeUntilUnits == '') {
+      timeParam.untilParam = 'now';
+    } else {
+      timeParam.untilParam = '-' + TimeRange.relativeUntilQuantity + TimeRange.relativeUntilUnits;
+    }
+  } else {
+    timeParam.fromParam = TimeRange.startDate.format(HM_format + '_' + YMD_format);
+    timeParam.untilParam = TimeRange.endDate.format(HM_format + '_' + YMD_format);
+  }
+  return timeParam;
 }
 
 function timeRangeUpdated() {
-  if (TimeRange.type == 'relative') {
-    var fromParam = '-' + TimeRange.relativeStartQuantity + TimeRange.relativeStartUnits;
-    if (TimeRange.relativeUntilUnits == 'now') {
-      var untilParam = 'now';
-    } else {
-      var untilParam = '-' + TimeRange.relativeUntilQuantity + TimeRange.relativeUntilUnits;
-    }
-  } else {
-    var fromParam = TimeRange.startDate.format('H:i_Ymd');
-    var untilParam = TimeRange.endDate.format('H:i_Ymd');
-  }
-  defaultGraphParams.from = fromParam;
-  defaultGraphParams.until = untilParam;
+  var timeParam = timeRangeForUrl();
+  defaultGraphParams.from = timeParam.fromParam;
+  defaultGraphParams.until = timeParam.untilParam;
   saveDefaultGraphParams();
 
   graphStore.each(function () {
-    this.data.params.from = fromParam;
-    this.data.params.until = untilParam;
+    this.data.params.from = timeParam.fromParam;
+    this.data.params.until = timeParam.untilParam;
   });
 
-  updateTimeText();
+  updateTimeText(timeParam);
   refreshGraphs();
 }
 
@@ -1870,6 +1891,43 @@ function graphClicked(graphView, graphIndex, element, evt) {
         });
         win.show();
       }
+    }, {
+      xtype: 'button',
+      fieldLabel: "<span style='visibility: hidden'>",
+      text: "Dashboard URL",
+      width: 100,
+      handler: function () {
+        menu.destroy();
+        var win = new Ext.Window({
+          title: "Graph URL",
+          width: 600,
+          height: 125,
+          layout: 'border',
+          modal: true,
+          items: [
+            {
+              xtype: "label",
+              region: 'north',
+              style: "text-align: center;",
+              text: "Dashboard URL for all graphs"
+            }, {
+              xtype: 'textfield',
+              region: 'center',
+              value:  linkLocation,
+              editable: false,
+              style: "text-align: center; font-size: large;",
+              listeners: {
+                focus: function (field) { field.selectText(); }
+              }
+            }
+          ],
+          buttonAlign: 'center',
+          buttons: [
+            {text: "Close", handler: function () { win.close(); } }
+          ]
+        });
+        win.show();
+      }
     }]
   });
 
@@ -2378,19 +2436,77 @@ function dateFromRelative(quantity, units)
 
 
 function applyState(state) {
+
   setDashboardName(state.name);
+  
+  // If we have URL parameters use that to reset state
+  var params = getQueryParams(self.location.search);
+  var isTimeFromQuery;
+  if (Object.getOwnPropertyNames(params).length > 0) {
+    for (var property in params) {
+      if (params.hasOwnProperty(property)) {
+        state.defaultGraphParams[property] = params[property]
+      }
+    }
+    saveDefaultGraphParams();
+
+    // We have a time monkey with it here
+    if (params.from != undefined) {
+  	  var timeParam = {fromParam: state.defaultGraphParams.from, untilParam: state.defaultGraphParams.until};
+  	  // Update all graphs with new time range
+  	  state.graphs.map(function (item) {
+  	    item[1].from = timeParam.fromParam;
+  	    item[1].until = timeParam.untilParam;
+  	  })
+  	    
+  	  // Setup timeConfig here
+  	  var timeConfig = new Object();
+  	  if (timeParam.fromParam.charAt(0) == '-') {
+  	    timeConfig.type = "relative";
+  	    var fromQuantityUnit = timeParam.fromParam.split(/(\d+)/);
+  	    timeConfig.relativeStartQuantity = fromQuantityUnit[1];
+  	    timeConfig.relativeStartUnits = fromQuantityUnit[2];
+  	    if (timeParam.untilParam == 'now' || timeParam.untilParam == '-' || timeParam.untilParam == '') {
+  	      timeConfig.relativeUntilUnits = 'now'
+  	    } else {
+  	      var untilQuantityUnit = timeParam.untilParam.split(/(\d+)/);
+  	      timeConfig.relativeUntilQuantity = untilQuantityUnit[1];
+          timeConfig.relativeUntilUnits = untilQuantityUnit[2];
+  	    }
+  	  } else {
+  	    timeConfig.type = "absolute";
+  	    var fromDateTime = timeParam.fromParam.split('_');
+  	    timeConfig.startDate = Date.parseDate(fromDateTime[1], YMD_format);
+  	    timeConfig.startTime = Date.parseDate(fromDateTime[0], HM_format);
+  	    var untilDateTime = timeParam.untilParam.split('_');
+        timeConfig.endDate = Date.parseDate(untilDateTime[1], YMD_format);
+        timeConfig.endTime = Date.parseDate(untilDateTime[0], HM_format);
+      }
+  	  state.timeConfig = timeConfig;
+    }
+  }
+
   //state.timeConfig = {type, quantity, units, untilQuantity, untilUnits, startDate, startTime, endDate, endTime}
   var timeConfig = state.timeConfig
-  TimeRange.type = timeConfig.type;
-  TimeRange.relativeStartQuantity = timeConfig.quantity;
-  TimeRange.relativeStartUnits = timeConfig.units;
-  TimeRange.relativeUntilQuantity = timeConfig.untilQuantity;
-  TimeRange.relativeUntilUnits = timeConfig.untilUnits;
-  TimeRange.startDate = new Date(timeConfig.startDate);
-  TimeRange.startTime = timeConfig.startTime;
-  TimeRange.endDate = new Date(timeConfig.endDate);
-  TimeRange.endTime = timeConfig.endTime;
-  updateTimeText();
+  if (timeConfig) {
+    TimeRange.type = timeConfig.type;
+    TimeRange.relativeStartQuantity = timeConfig.relativeStartQuantity;
+    TimeRange.relativeStartUnits = timeConfig.relativeStartUnits;
+    TimeRange.relativeUntilQuantity = timeConfig.relativeUntilQuantity;
+    TimeRange.relativeUntilUnits = timeConfig.relativeUntilUnits;
+    if (timeConfig.type == "relative") {
+      TimeRange.startDate = dateFromRelative(timeConfig.relativeStartQuantity, timeConfig.relativeStartUnits);
+      TimeRange.startTime = TimeRange.startDate.getHours() + ":00"
+      TimeRange.endDate = dateFromRelative(timeConfig.relativeUntilQuantity, timeConfig.relativeUntilUnits);
+      TimeRange.endTime = (TimeRange.endDate.getHours() + 2) + ":00"
+    } else {
+      TimeRange.startDate = new Date(timeConfig.startDate);
+      TimeRange.startTime = timeConfig.startTime;
+      TimeRange.endDate = new Date(timeConfig.endDate);
+      TimeRange.endTime = timeConfig.endTime;
+    }
+    updateTimeText(timeRangeForUrl());
+  }
 
   //state.refreshConfig = {enabled, interval}
   var refreshConfig = state.refreshConfig;

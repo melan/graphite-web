@@ -148,6 +148,11 @@ function createToolbarButton(tip, icon, handler) {
   });
 }
 
+function getUTCDate() {
+  var now = new Date(); 
+  return new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),  now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
+}
+
 /* "Date Range" Calendar */
 function createCalendarWindow() {
   // Start/End labels
@@ -161,11 +166,11 @@ function createCalendarWindow() {
   // Date controls
   var startDateControl = new Ext.DatePicker({
     id: 'start-date',
-    maxDate: new Date()
+    maxDate: getUTCDate()
   });
   var endDateControl = new Ext.DatePicker({
     id: 'end-date',
-    maxDate: new Date()
+    maxDate: getUTCDate()
   });
   startDateControl.on('select', calendarSelectionMade);
   endDateControl.on('select', calendarSelectionMade);

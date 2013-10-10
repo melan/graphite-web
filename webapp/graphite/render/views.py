@@ -111,6 +111,7 @@ def renderView(request):
     format = requestOptions.get('format')
     if format == 'csv':
       response = HttpResponse(mimetype='text/csv')
+      response['Content-Disposition'] = 'attachment; filename=render.csv'
       writer = csv.writer(response, dialect='excel')
 
       for series in data:
