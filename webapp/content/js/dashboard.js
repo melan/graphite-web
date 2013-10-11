@@ -2488,25 +2488,16 @@ function applyState(state) {
 
   //state.timeConfig = {type, quantity, units, untilQuantity, untilUnits, startDate, startTime, endDate, endTime}
   var timeConfig = state.timeConfig
-  if (timeConfig) {
-    TimeRange.type = timeConfig.type;
-    TimeRange.relativeStartQuantity = timeConfig.relativeStartQuantity;
-    TimeRange.relativeStartUnits = timeConfig.relativeStartUnits;
-    TimeRange.relativeUntilQuantity = timeConfig.relativeUntilQuantity;
-    TimeRange.relativeUntilUnits = timeConfig.relativeUntilUnits;
-    if (timeConfig.type == "relative") {
-      TimeRange.startDate = dateFromRelative(timeConfig.relativeStartQuantity, timeConfig.relativeStartUnits);
-      TimeRange.startTime = TimeRange.startDate.getHours() + ":00"
-      TimeRange.endDate = dateFromRelative(timeConfig.relativeUntilQuantity, timeConfig.relativeUntilUnits);
-      TimeRange.endTime = (TimeRange.endDate.getHours() + 2) + ":00"
-    } else {
-      TimeRange.startDate = new Date(timeConfig.startDate);
-      TimeRange.startTime = timeConfig.startTime;
-      TimeRange.endDate = new Date(timeConfig.endDate);
-      TimeRange.endTime = timeConfig.endTime;
-    }
-    updateTimeText(timeRangeForUrl());
-  }
+  TimeRange.type = timeConfig.type;
+  TimeRange.relativeStartQuantity = timeConfig.quantity;
+  TimeRange.relativeStartUnits = timeConfig.units;
+  TimeRange.relativeUntilQuantity = timeConfig.untilQuantity;
+  TimeRange.relativeUntilUnits = timeConfig.untilUnits;
+  TimeRange.startDate = new Date(timeConfig.startDate);
+  TimeRange.startTime = timeConfig.startTime;
+  TimeRange.endDate = new Date(timeConfig.endDate);
+  TimeRange.endTime = timeConfig.endTime;
+  updateTimeText();
 
   //state.refreshConfig = {enabled, interval}
   var refreshConfig = state.refreshConfig;
