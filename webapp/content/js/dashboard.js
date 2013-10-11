@@ -2497,7 +2497,7 @@ function applyState(state) {
   TimeRange.startTime = timeConfig.startTime;
   TimeRange.endDate = new Date(timeConfig.endDate);
   TimeRange.endTime = timeConfig.endTime;
-  updateTimeText();
+  updateTimeText(timeRangeForUrl());
 
   //state.refreshConfig = {enabled, interval}
   var refreshConfig = state.refreshConfig;
