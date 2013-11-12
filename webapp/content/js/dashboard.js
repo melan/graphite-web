@@ -21,9 +21,11 @@ var NOT_EDITABLE = ['from', 'until', 'width', 'height', 'target', 'uniq', '_uniq
 var dashNavigation = false;
 var varFindURL;
 var URLname;
-var YMD_format = 'Ymd';
 var HM_format = 'H:i';
+var YMD_format = 'Ymd';
+var HM_display_format = 'g:i A';
 var linkLocation;
+var requestParams = getQueryParams(self.location.search);
 
 var cookieProvider = new Ext.state.CookieProvider({
   path: "/dashboard"
@@ -32,6 +34,14 @@ var cookieProvider = new Ext.state.CookieProvider({
 var NAV_BAR_REGION = cookieProvider.get('navbar-region') || 'north';
 
 var CONFIRM_REMOVE_ALL = cookieProvider.get('confirm-remove-all') != 'false';
+
+/* If there is dashname remove that with a redirect to #name */
+if (requestParams.dashname != undefined) {
+  var name = requestParams.dashname;
+  delete requestParams.dashname;
+  self.location.href = self.location.protocol + "//" + self.location.host + self.location.pathname +
+    (Object.getOwnPropertyNames(requestParams).length === 0 ? "" : "?" + jQuery.param(requestParams)) + "#" + name;
+}
 
 /* Find if used is landing on dashlist (Navigator) or dashboard (Composer) */
 var urlLink = location.href;
@@ -1146,8 +1156,8 @@ function getQueryParams(qs) {
 
 function updateTimeText(timeParam) {
   graphArea.getTopToolbar().get('time-range-text').setText( getTimeText() );
-  var params = jQuery.extend(getQueryParams(self.location.search), {"from": timeParam.fromParam, "until": timeParam.untilParam});
-  linkLocation = self.location.protocol + "//" + self.location.host + self.location.pathname + "?" + jQuery.param(params) + self.location.hash;
+  var params = jQuery.extend(requestParams, {"from": timeParam.fromParam, "until": timeParam.untilParam, "dashname": self.location.hash.substr(1)});
+  linkLocation = self.location.protocol + "//" + self.location.host + self.location.pathname + "?" + jQuery.param(params);
 }
 
 function timeRangeForUrl() {
@@ -2440,18 +2450,17 @@ function applyState(state) {
   setDashboardName(state.name);
   
   // If we have URL parameters use that to reset state
-  var params = getQueryParams(self.location.search);
   var isTimeFromQuery;
-  if (Object.getOwnPropertyNames(params).length > 0) {
-    for (var property in params) {
-      if (params.hasOwnProperty(property)) {
-        state.defaultGraphParams[property] = params[property]
+  if (Object.getOwnPropertyNames(requestParams).length > 0) {
+    for (var property in requestParams) {
+      if (requestParams.hasOwnProperty(property)) {
+        state.defaultGraphParams[property] = requestParams[property]
       }
     }
     saveDefaultGraphParams();
 
     // We have a time monkey with it here
-    if (params.from != undefined) {
+    if (requestParams.from != undefined) {
   	  var timeParam = {fromParam: state.defaultGraphParams.from, untilParam: state.defaultGraphParams.until};
   	  // Update all graphs with new time range
   	  state.graphs.map(function (item) {
@@ -2475,12 +2484,10 @@ function applyState(state) {
   	    }
   	  } else {
   	    timeConfig.type = "absolute";
-  	    var fromDateTime = timeParam.fromParam.split('_');
-  	    timeConfig.startDate = Date.parseDate(fromDateTime[1], YMD_format);
-  	    timeConfig.startTime = Date.parseDate(fromDateTime[0], HM_format);
-  	    var untilDateTime = timeParam.untilParam.split('_');
-        timeConfig.endDate = Date.parseDate(untilDateTime[1], YMD_format);
-        timeConfig.endTime = Date.parseDate(untilDateTime[0], HM_format);
+  	    timeConfig.startDate = Date.parseDate(timeParam.fromParam.replace('_', ' '), HM_format + ' ' + YMD_format);
+  	    timeConfig.startTime = timeConfig.startDate.format(HM_display_format);
+        timeConfig.endDate = Date.parseDate(timeParam.untilParam.replace('_', ' '), HM_format + ' ' + YMD_format);
+        timeConfig.endTime = timeConfig.endDate.format(HM_display_format);
       }
   	  state.timeConfig = timeConfig;
     }
@@ -2489,10 +2496,10 @@ function applyState(state) {
   //state.timeConfig = {type, quantity, units, untilQuantity, untilUnits, startDate, startTime, endDate, endTime}
   var timeConfig = state.timeConfig
   TimeRange.type = timeConfig.type;
-  TimeRange.relativeStartQuantity = timeConfig.quantity;
-  TimeRange.relativeStartUnits = timeConfig.units;
-  TimeRange.relativeUntilQuantity = timeConfig.untilQuantity;
-  TimeRange.relativeUntilUnits = timeConfig.untilUnits;
+  TimeRange.relativeStartQuantity = timeConfig.relativeStartQuantity;
+  TimeRange.relativeStartUnits = timeConfig.relativeStartUnits;
+  TimeRange.relativeUntilQuantity = timeConfig.relativeUntilQuantity;
+  TimeRange.relativeUntilUnits = timeConfig.relativeUntilUnits;
   TimeRange.startDate = new Date(timeConfig.startDate);
   TimeRange.startTime = timeConfig.startTime;
   TimeRange.endDate = new Date(timeConfig.endDate);
