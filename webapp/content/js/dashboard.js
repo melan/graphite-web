@@ -1120,10 +1120,10 @@ var defaultRelativeUnits = RegExp.$2;
 var TimeRange = {
   // Default to a relative time range
   type: 'relative',
-  relativeStartQuantity: defaultRelativeQuantity,
-  relativeStartUnits: defaultRelativeUnits,
-  relativeUntilQuantity: '',
-  relativeUntilUnits: 'now',
+  quantity: defaultRelativeQuantity,
+  units: defaultRelativeUnits,
+  untilQuantity: '',
+  untilUnits: 'now',
   // Absolute time range
   startDate: new Date(),
   startTime: "9:00 AM",
@@ -1133,9 +1133,9 @@ var TimeRange = {
 
 function getTimeText() {
   if (TimeRange.type == 'relative') {
-    var text = "Now showing the past " + TimeRange.relativeStartQuantity + " " + TimeRange.relativeStartUnits;
-    if (TimeRange.relativeUntilUnits != 'now' && TimeRange.relativeUntilUnits != '') {
-      text = text + " until " + TimeRange.relativeUntilQuantity + " " + TimeRange.relativeUntilUnits + " ago";
+    var text = "Now showing the past " + TimeRange.quantity + " " + TimeRange.units;
+    if (TimeRange.untilUnits != 'now' && TimeRange.untilUnits != '') {
+      text = text + " until " + TimeRange.untilQuantity + " " + TimeRange.untilUnits + " ago";
     }
     return text;
   } else {
@@ -1163,11 +1163,11 @@ function updateTimeText(timeParam) {
 function timeRangeForUrl() {
   var timeParam = new Object();
   if (TimeRange.type == 'relative') {
-    timeParam.fromParam = '-' + TimeRange.relativeStartQuantity + TimeRange.relativeStartUnits;
-    if (TimeRange.relativeUntilUnits == 'now' || TimeRange.relativeUntilUnits == '') {
+    timeParam.fromParam = '-' + TimeRange.quantity + TimeRange.units;
+    if (TimeRange.untilUnits == 'now' || TimeRange.untilUnits == '') {
       timeParam.untilParam = 'now';
     } else {
-      timeParam.untilParam = '-' + TimeRange.relativeUntilQuantity + TimeRange.relativeUntilUnits;
+      timeParam.untilParam = '-' + TimeRange.untilQuantity + TimeRange.untilUnits;
     }
   } else {
     timeParam.fromParam = TimeRange.startDate.format(HM_format + '_' + YMD_format);
@@ -1199,7 +1199,7 @@ function selectRelativeTime() {
     allowBlank: false,
     regex: /\d+/,
     regexText: "Please enter a number",
-    value: TimeRange.relativeStartQuantity
+    value: TimeRange.quantity
   });
 
   var unitField = new Ext.form.ComboBox({
@@ -1211,7 +1211,7 @@ function selectRelativeTime() {
     allowBlank: false,
     forceSelection: true,
     store: ['minutes', 'hours', 'days', 'weeks', 'months'],
-    value: TimeRange.relativeStartUnits
+    value: TimeRange.units
   });
 
   var untilQuantityField = new Ext.form.TextField({
@@ -1221,7 +1221,7 @@ function selectRelativeTime() {
     allowBlank: true,
     regex: /\d+/,
     regexText: "Please enter a number",
-    value: TimeRange.relativeUntilQuantity
+    value: TimeRange.untilQuantity
   });
 
   var untilUnitField = new Ext.form.ComboBox({
@@ -1233,7 +1233,7 @@ function selectRelativeTime() {
     allowBlank: true,
     forceSelection: false,
     store: ['now', 'minutes', 'hours', 'days', 'weeks', 'months'],
-    value: TimeRange.relativeUntilUnits,
+    value: TimeRange.untilUnits,
     listeners: {
       select: function(combo, record, index) {
                   if (index == 0) {
@@ -1259,10 +1259,10 @@ function selectRelativeTime() {
 
   function updateTimeRange() {
     TimeRange.type = 'relative';
-    TimeRange.relativeStartQuantity = quantityField.getValue();
-    TimeRange.relativeStartUnits = unitField.getValue();
-    TimeRange.relativeUntilQuantity = untilQuantityField.getValue();
-    TimeRange.relativeUntilUnits = untilUnitField.getValue();
+    TimeRange.quantity = quantityField.getValue();
+    TimeRange.units = unitField.getValue();
+    TimeRange.untilQuantity = untilQuantityField.getValue();
+    TimeRange.untilUnits = untilUnitField.getValue();
     win.close();
     timeRangeUpdated();
   }
@@ -2473,14 +2473,14 @@ function applyState(state) {
   	  if (timeParam.fromParam.charAt(0) == '-') {
   	    timeConfig.type = "relative";
   	    var fromQuantityUnit = timeParam.fromParam.split(/(\d+)/);
-  	    timeConfig.relativeStartQuantity = fromQuantityUnit[1];
-  	    timeConfig.relativeStartUnits = fromQuantityUnit[2];
+  	    timeConfig.quantity = fromQuantityUnit[1];
+  	    timeConfig.units = fromQuantityUnit[2];
   	    if (timeParam.untilParam == 'now' || timeParam.untilParam == '-' || timeParam.untilParam == '') {
-  	      timeConfig.relativeUntilUnits = 'now'
+  	      timeConfig.untilUnits = 'now'
   	    } else {
   	      var untilQuantityUnit = timeParam.untilParam.split(/(\d+)/);
-  	      timeConfig.relativeUntilQuantity = untilQuantityUnit[1];
-          timeConfig.relativeUntilUnits = untilQuantityUnit[2];
+  	      timeConfig.untilQuantity = untilQuantityUnit[1];
+          timeConfig.untilUnits = untilQuantityUnit[2];
   	    }
   	  } else {
   	    timeConfig.type = "absolute";
@@ -2496,10 +2496,10 @@ function applyState(state) {
   //state.timeConfig = {type, quantity, units, untilQuantity, untilUnits, startDate, startTime, endDate, endTime}
   var timeConfig = state.timeConfig
   TimeRange.type = timeConfig.type;
-  TimeRange.relativeStartQuantity = timeConfig.relativeStartQuantity;
-  TimeRange.relativeStartUnits = timeConfig.relativeStartUnits;
-  TimeRange.relativeUntilQuantity = timeConfig.relativeUntilQuantity;
-  TimeRange.relativeUntilUnits = timeConfig.relativeUntilUnits;
+  TimeRange.quantity = timeConfig.quantity;
+  TimeRange.units = timeConfig.units;
+  TimeRange.untilQuantity = timeConfig.untilQuantity;
+  TimeRange.untilUnits = timeConfig.untilUnits;
   TimeRange.startDate = new Date(timeConfig.startDate);
   TimeRange.startTime = timeConfig.startTime;
   TimeRange.endDate = new Date(timeConfig.endDate);
