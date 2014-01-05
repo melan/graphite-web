@@ -12,7 +12,7 @@ var graphArea;
 var graphStore;
 var graphView;
 var navBar;
-var dashboardName;
+var dashboardName = "";
 var dashboardURL;
 var refreshTask;
 var spacer;
@@ -26,6 +26,9 @@ var YMD_format = 'Ymd';
 var HM_display_format = 'g:i A';
 var linkLocation;
 var requestParams = getQueryParams(self.location.search);
+var tokenDelimiter = ':';
+var nodeSelect = 's';
+var nodeToggle = 't';
 
 /* If there is dashname remove that with a redirect to #name */
 if (requestParams.dashname != undefined) {
@@ -152,6 +155,11 @@ if (sessionDefaultParamsJson && sessionDefaultParamsJson.length > 0) {
 
 
 function initDashboard () {
+  // The only requirement for this to work is that you must have a hidden field and
+  // an iframe available in the page with ids corresponding to Ext.History.fieldId
+  // and Ext.History.iframeId.  See dashboard.html.
+  Ext.History.init();
+    
   // Populate naming-scheme based datastructures
   Ext.each(schemes, function (scheme_info) {
     scheme_info.id = scheme_info.name;
@@ -755,7 +763,7 @@ function initDashboard () {
 
   if(window.location.hash != '')
   {
-    sendLoadRequest(window.location.hash.substr(1));
+    navToHash(window.location.hash.substr(1));
   }
 
   if (initialError) {
@@ -765,14 +773,41 @@ function initDashboard () {
     applyState(initialState);
     navBar.collapse();
   }
-  //If the URL already has a dashboard name, then collapse the bar
-  var urlparts = location.href;
-  var i = urlparts.indexOf('#');
-  if (i != -1) {
-     navBar.collapse();
-  }
+  
+  // Handle this change event in order to restore the UI to the appropriate history state
+  Ext.History.on('change', navToHash);
 }
 
+function navToHash(token) {
+  if (token) {
+    var index = token.indexOf(tokenDelimiter);
+    var dashName = (index < 0) ? token : token.substring(0, index);
+    var treeNodeIdOp = (index < 0) ? null : token.substring(index+1).split(tokenDelimiter);
+    
+    if (dashName) goToDashboard(dashName);
+    if (treeNodeIdOp !== null) {
+      var tree = Ext.getCmp(treeNodeIdOp[0]);
+      if (tree) {
+        navBar.expand();
+        var treeNode = tree.getNodeById(treeNodeIdOp[1]);
+        if (treeNode) {
+          if (treeNodeIdOp[2] == nodeToggle) {
+            treeNode.toggle();
+          } else {
+            treeNode.select();
+          }
+        } else {
+          //alert("Node not found in history");
+        }
+      }
+    }
+  } else {
+    // This is the initial default state.  Necessary if you navigate starting from the
+    // page without any existing history token params and go back to the start state.
+    //
+  }
+}
+  
 function goToDashboard(name) {
   var dashName=name.replace(/\./g,'-');
   sendLoadRequest(dashName);
@@ -922,6 +957,7 @@ function metricTreeSelectorShow(pattern) {
   var base_parts = pattern.split('.');
 
   function setParams (loader, node, callback) {
+    Ext.History.add(tokenDelimiter + node.getOwnerTree().getId() + tokenDelimiter + node.id + tokenDelimiter + nodeSelect);
     loader.baseParams.format = 'treejson';
 
     if (node.id == 'rootMetricSelectorNode') {
@@ -960,7 +996,7 @@ function metricTextSelectorShow(pattern) {
 
 function metricTreeSelectorNodeClicked (node, e) {
   if (!node.leaf) {
-    node.toggle();
+    Ext.History.add(tokenDelimiter + node.getOwnerTree().getId() + tokenDelimiter + node.id + tokenDelimiter + nodeToggle);
     return;
   }
 
@@ -2372,12 +2408,12 @@ function saveDashboard() {
     "Enter the name to save this dashboard as",
     function (button, text) {
       if (button == 'ok') {
-	if (dashboardName == text) {
-		Ext.Msg.alert("Error", "Cannot save dashboard in SAVE AS mode with same name");
-	} else {
+        if (dashboardName == text) {
+          Ext.Msg.alert("Error", "Cannot save dashboard in SAVE AS mode with same name");
+        } else {
         	setDashboardName(text);
-        	sendSaveRequest(text);
-	}
+          sendSaveRequest(text);
+        }
       }
     },
     this,
