@@ -257,7 +257,7 @@ def set_metadata_view(request):
   return HttpResponse(json.dumps(results), mimetype='application/json')
 
 
-def tree_json(nodes, base_path, wildcards=False, contexts=False):
+def tree_json(nodes, base_path, wildcards=False, contexts=False, dot_leaf=False):
   results = []
 
   branchNode = {
@@ -287,13 +287,15 @@ def tree_json(nodes, base_path, wildcards=False, contexts=False):
   results_leaf = []
   results_branch = []
   for node in nodes: #Now let's add the matching children
-    if node.name in found:
+    namedLeaf = node.name + str(node.isLeaf())
+    if namedLeaf in found:
       continue
 
-    found.add(node.name)
+    found.add(namedLeaf)
+    leafExt = '.' if dot_leaf and not node.isLeaf() else ''
     resultNode = {
       'text' : str(node.name),
-      'id' : base_path + str(node.name),
+      'id' : base_path + str(node.name) + leafExt
     }
 
     if contexts:

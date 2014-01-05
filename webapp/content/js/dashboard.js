@@ -27,14 +27,6 @@ var HM_display_format = 'g:i A';
 var linkLocation;
 var requestParams = getQueryParams(self.location.search);
 
-var cookieProvider = new Ext.state.CookieProvider({
-  path: "/dashboard"
-});
-
-var NAV_BAR_REGION = cookieProvider.get('navbar-region') || 'north';
-
-var CONFIRM_REMOVE_ALL = cookieProvider.get('confirm-remove-all') != 'false';
-
 /* If there is dashname remove that with a redirect to #name */
 if (requestParams.dashname != undefined) {
   var name = requestParams.dashname;
@@ -48,6 +40,15 @@ var urlLink = location.href;
 if (urlLink.indexOf("dashlist") !=-1) {
    dashNavigation = true;
 }
+
+var cookieProvider = new Ext.state.CookieProvider({
+  path: (dashNavigation) ? "/dashlist" : "/dashboard"
+});
+
+var NAV_BAR_REGION = cookieProvider.get('navbar-region') || 'north';
+
+var CONFIRM_REMOVE_ALL = cookieProvider.get('confirm-remove-all') != 'false';
+
 if (dashNavigation) {
    varFindURL= "/dashboard/findDB/";
    URLname="dashlist";
@@ -91,14 +92,14 @@ var schemesStore = new Ext.data.Store({
   fields: SchemeRecord
 });
 
-
 var ContextFieldValueRecord = Ext.data.Record.create([
   {name: 'name'},
-  {path: 'path'}
+  {name: 'path'},
+  {name: 'is_leaf'}
 ]);
 
 if (dashNavigation) {
-   varBaseParams= {format: 'completer', wildcards: '1', query: 'MT-'};
+   varBaseParams= {format: 'completer', wildcards: '1', query: MasterTemplate};
 } else {
    varBaseParams= {format: 'completer', wildcards: '1'};
 }  
@@ -173,7 +174,7 @@ function initDashboard () {
         queryParam: 'query',
         minChars: 1,
         typeAhead: false,
-        value: queryString[field.name] || getContextFieldCookie(field.name) || "*",
+        value: queryString[field.name] || getContextFieldCookie(field.name) || normalizeMetricsQuery('', ''),
         listeners: {
           beforequery: buildQuery,
           change: contextFieldChanged,
@@ -287,9 +288,9 @@ function initDashboard () {
   } else { // NAV_BAR_REGION == 'north'
     metricSelectorMode = 'text';
     if ( dashNavigation ) {
-	queryParams = { query: 'MT' };
+      queryParams = { query: MasterTemplate, format: 'completer' };
     } else {
-	queryParams = { query: '', format: 'completer', automatic_variants: (UI_CONFIG.automatic_variants) ? '1' : '0'};
+      queryParams = { query: '', format: 'completer', automatic_variants: (UI_CONFIG.automatic_variants) ? '1' : '0'};
     }
 
     metricSelectorGrid = new Ext.grid.GridPanel({
@@ -329,28 +330,26 @@ function initDashboard () {
        	url: varFindURL,
         autoLoad: true,
         baseParams: queryParams,
-	fields: ['path', 'is_leaf'],
-	root: 'metrics',
+        fields: ['path', 'is_leaf'],
+        root: 'metrics',
       }),
 
       listeners: {
         rowclick: function (thisGrid, rowIndex, e) {
-                    var record = thisGrid.getStore().getAt(rowIndex);
-                    if (record.data['is_leaf'] == '1') {
-		       if ( dashNavigation ) {
-		          var dashName=record.data.path.replace(/\./g,'-');
-		          sendLoadRequest(dashName);
-		          navBar.collapse();
-		       } else {
-                          graphAreaToggle(record.data.path);
-                          thisGrid.getView().refresh();
-		       }
-                    } else {
-                      metricSelectorTextField.setValue(record.data.path);
-                    }
-                    autocompleteTask.delay(50);
-                    focusCompleter();
-                  }
+          var record = thisGrid.getStore().getAt(rowIndex);
+          if (record.data['is_leaf'] == '1') {
+            if ( dashNavigation ) {
+              goToDashboard(record.data.path);
+            } else {
+              graphAreaToggle(record.data.path);
+              thisGrid.getView().refresh();
+            }
+          } else {
+            metricSelectorTextField.setValue(record.data.path);
+          }
+          autocompleteTask.delay(50);
+          focusCompleter();
+        }
       }
     });
 
@@ -774,6 +773,12 @@ function initDashboard () {
   }
 }
 
+function goToDashboard(name) {
+  var dashName=name.replace(/\./g,'-');
+  sendLoadRequest(dashName);
+  navBar.collapse();
+}
+  
 function showHelp() {
   var win = new Ext.Window({
     title: "Keyboard Shortcuts",
@@ -802,6 +807,24 @@ function metricTypeSelected (combo, record, index) {
   focusCompleter();
 }
 
+function normalizeMetricsQuery(query, ext) {
+  if (dashNavigation) {
+    if (query == '*') {
+      return '';
+    }
+    if (query.lastIndexOf('*', 0) === 0) {
+      query = query.replace(/\*/, MasterTemplate);
+    } else if (query.lastIndexOf(MasterTemplate, 0) != 0) {
+      query = MasterTemplate + '.' + query;
+    }
+    if (query.indexOf('.', query.length - 1) === -1) {
+      query = query + '.';
+    }
+    return query.replace(/\./g,"-");
+  } else {
+    return query + ext + '*';
+  }
+}
 
 function buildQuery (queryEvent) {
   var queryString = "";
@@ -831,7 +854,7 @@ function buildQuery (queryEvent) {
     }
 
     if (combo === queryEvent.combo) {
-      queryEvent.query = queryString + queryEvent.query + '*';
+      queryEvent.query = normalizeMetricsQuery(queryString + queryEvent.query, '');
       return;
     } else {
       if (value) {
@@ -902,12 +925,9 @@ function metricTreeSelectorShow(pattern) {
     loader.baseParams.format = 'treejson';
 
     if (node.id == 'rootMetricSelectorNode') {
-      loader.baseParams.query = pattern + '.*';
+      loader.baseParams.query = normalizeMetricsQuery(pattern, '.');
     } else {
-      var id_parts = node.id.split('.');
-      id_parts.splice(0, base_parts.length); //make it relative
-      var relative_id = id_parts.join('.');
-      loader.baseParams.query = pattern + '.' + relative_id + '.*';
+      loader.baseParams.query = normalizeMetricsQuery(node.id, '.');
     }
   }
 
@@ -944,7 +964,11 @@ function metricTreeSelectorNodeClicked (node, e) {
     return;
   }
 
-  graphAreaToggle(node.id);
+  if (dashNavigation) {
+    goToDashboard(node.id);
+  } else {
+    graphAreaToggle(node.id);
+  }
 }
 
 
@@ -1431,7 +1455,7 @@ function newFromSavedGraph() {
   function handleSelects(selModel, nodes) {
     Ext.each(nodes, function (node, index) {
       if (!node.leaf) {
-	node.unselect();
+        node.unselect();
         node.toggle();
       }
     });

@@ -5,13 +5,13 @@ from os.path import getmtime, join, exists
 from urllib import urlencode
 from ConfigParser import ConfigParser
 from django.shortcuts import render_to_response
-from django.http import HttpResponse, QueryDict
+from django.http import HttpResponse, QueryDict, HttpResponseBadRequest
 from django.conf import settings
 from graphite.util import json
 from graphite.dashboard.models import Dashboard
+from graphite.metrics.views import tree_json
 from graphite.render.views import renderView
 from send_graph import send_graph_email
-from operator import itemgetter
 
 
 fieldRegex = re.compile(r'<([^>]+)>')
@@ -202,52 +202,92 @@ def find(request):
   return json_response( dict(dashboards=results) )
 
 
+class Node:
+  def __init__(self, isLeaf, dataPath, nodeName):
+    self.is_leaf = isLeaf
+    self.metric_path = dataPath
+    self.name = nodeName
+    
+  def __eq__(self, other):
+    return self.is_leaf == other.is_leaf and self.metric_path == other.metric_path and self.name == other.name
+    
+  def __hash__(self):
+    return self.is_leaf + self.metric_path + self.name
+  
+  def isLeaf(self):
+    return self.is_leaf == '1';
+    
 def findDB(request):
   query = request.REQUEST.get('query')
   if not query:
      query = 'MT-'
   wildcards = int( request.REQUEST.get('wildcards', 0) )
+  format = request.REQUEST.get('format', 'treejson')
+  
+  if '-' in query:
+    base_path = query.replace('-', '.').rsplit('.', 1)[0] + '.'
+  else:
+    base_path = ''
+    
   query_terms =  query.lower().split()
-  results = []
+  matches = []
 
   # Find all dashboard names that contain each of our query terms as a substring
   for dashboard in Dashboard.objects.all():
     for term in query_terms:
-       #term=term.strip("-$")
-       name = dashboard.name.lower()
-       if name == term:
-         continue
-       if name.startswith(term):
-         OrigNameList=dashboard.name.replace('-','.').split('.')
-         nameList=name.replace('-','.').split('.')
-         nameListLength=len(nameList)
-         termList=term.strip("-$").replace('-','.').split('.')
-         termListLength=len(termList)
-         thisTermItem=termList[-1]
-         thisTermPosInNameList=nameList.index(thisTermItem)
-	 if nameListLength == termListLength+1:
-            is_leaf='1'
-            nextTermItem=OrigNameList[thisTermPosInNameList+1]
-            dataPath=query.strip("-$").replace('-','.')+'.'+nextTermItem
-         elif nameListLength == termListLength:
-            is_leaf='1'
-            nextTermItem=OrigNameList[thisTermPosInNameList]
-            #dataPath=query.replace('-','.')+'.'+nextTermItem
-            dataPath=query.replace('-','.')
-         else:
-            is_leaf='0'
-            nextTermItem=OrigNameList[thisTermPosInNameList+1]
-            dataPath=query.strip("-$").replace('-','.')+'.'+nextTermItem+'.'
+      #term=term.strip("-$")
+      name = dashboard.name.lower()
+      if name == term:
+        continue
+      if name.startswith(term):
+        OrigNameList=dashboard.name.replace('-','.').split('.')
+        nameList=name.replace('-','.').split('.')
+        nameListLength=len(nameList)
+        termList=term.strip("-$").replace('-','.').split('.')
+        termListLength=len(termList)
+        thisTermItem=termList[-1]
+        thisTermPosInNameList=nameList.index(thisTermItem)
+        if nameListLength == termListLength+1:
+          is_leaf='1'
+          nextTermItem=OrigNameList[thisTermPosInNameList+1]
+          dataPath=query.strip("-$").replace('-','.')+'.'+nextTermItem
+        elif nameListLength == termListLength:
+          is_leaf='1'
+          nextTermItem=OrigNameList[thisTermPosInNameList]
+          #dataPath=query.replace('-','.')+'.'+nextTermItem
+          dataPath=query.replace('-','.')
+        else:
+          is_leaf='0'
+          nextTermItem=OrigNameList[thisTermPosInNameList+1]
+          dataPath=query.strip("-$").replace('-','.')+'.'+nextTermItem+'.'
  
-         if not dict(is_leaf=is_leaf, path=dataPath, name=nextTermItem) in results: 
-            results.append( dict(is_leaf=is_leaf, path=dataPath, name=nextTermItem) )
+        node = Node(is_leaf, dataPath, nextTermItem)
+        if not node in matches: 
+          matches.append(node)
 
-  if len(results) > 1 and wildcards:
+  matches.sort(key=lambda node: node.name)
+ 
+  if format == 'treejson':
+    response = HttpResponse(tree_json(matches, base_path, dot_leaf=True), mimetype='application/json')
+  elif format == 'completer':
+    results = []
+    for node in matches:
+      node_info = dict(path=node.metric_path, name=node.name, is_leaf=str(int(node.isLeaf())))
+      results.append(node_info)
+
+    if len(results) > 1 and wildcards:
       wildcardNode = {'name' : '*'}
       results.append(wildcardNode)
+      
+    response = json_response(dict(metrics=results))
+  else:
+    return HttpResponseBadRequest(content="Invalid value for 'format' parameter", mimetype="text/plain")
 
-  return json_response( dict(metrics=sorted(results, key=itemgetter('name') ) ) )
-
+  # Add non caching header
+  response['Pragma'] = 'no-cache'
+  response['Cache-Control'] = 'no-cache'
+  return response
+  
 
 def help(request):
   context = {}
