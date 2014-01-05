@@ -139,6 +139,59 @@ def renderView(request):
       response['Cache-Control'] = 'no-cache'
       return response
 
+    ### Format to return back data in the format required by Google API Line Charts ###
+    if format == 'gapiLine':
+      series_data = []
+      col_labels = []
+      this_series=[]
+      count=0
+      col_labels.append( dict(label='Date', type='datetime') )
+      for series in data:
+	col_labels.append( dict(label=series.name, type='number') ) ##Add the column labels
+        series_value=''
+        for i, value in enumerate(series): ##Store values of each series into a list
+           if series_value.strip():
+              series_value=series_value+','+str(value)
+           else:
+              series_value=str(value)
+        this_series.append(series_value)
+	count+=1
+
+      full_row=[]
+      j=0
+      timeStamp=series.start
+      while (timeStamp <= series.end):
+        row_date = []
+        row_data = []
+	timeStamp=series.start+series.step*j
+	row_date.append( dict(v="Date("+str(timeStamp)+")") ) ##Load the Date value
+        for eachSeries in this_series: ##For each of the seperate metric points load the value for this time stamp
+           LIST=str(eachSeries).split(',')
+           try:
+              thisValue=LIST[j]
+              if (thisValue=='None'):
+	         row_data.append(dict (v=0) )
+              else:
+	         row_data.append(dict (v=thisValue) )
+           except IndexError:
+	      row_data.append(dict (v=0) )
+        j+=1
+        full_row.append( dict(c=row_date+row_data) )
+
+      series_data.append( dict(cols=col_labels,rows=full_row) )
+      return_data=json.dumps(series_data)
+      return_data=return_data.strip('^[').strip(']$') ##Strip off the leading and trainling ], as google api doesn't like it
+      if 'jsonp' in requestOptions:
+        response = HttpResponse(
+          content="%s(%s)" % (requestOptions['jsonp'], return_data),
+          mimetype='text/javascript')
+      else:
+        response = HttpResponse(content=return_data, mimetype='application/json')
+
+      response['Pragma'] = 'no-cache'
+      response['Cache-Control'] = 'no-cache'
+      return response
+
     if format == 'raw':
       response = HttpResponse(mimetype='text/plain')
       for series in data:
