@@ -147,7 +147,7 @@ def renderView(request):
       count=0
       col_labels.append( dict(label='Date', type='datetime') )
       for series in data:
-	col_labels.append( dict(label=series.name, type='number') ) ##Add the column labels
+        col_labels.append( dict(label=series.name, type='number') ) ##Add the column labels
         series_value=''
         for i, value in enumerate(series): ##Store values of each series into a list
            if series_value.strip():
@@ -155,7 +155,7 @@ def renderView(request):
            else:
               series_value=str(value)
         this_series.append(series_value)
-	count+=1
+        count+=1
 
       full_row=[]
       j=0
@@ -163,18 +163,18 @@ def renderView(request):
       while (timeStamp <= series.end):
         row_date = []
         row_data = []
-	timeStamp=series.start+series.step*j
-	row_date.append( dict(v="Date("+str(timeStamp)+")") ) ##Load the Date value
+        timeStamp=series.start+series.step*j
+        row_date.append( dict(v="Date("+str(timeStamp)+")") ) ##Load the Date value
         for eachSeries in this_series: ##For each of the seperate metric points load the value for this time stamp
            LIST=str(eachSeries).split(',')
            try:
               thisValue=LIST[j]
               if (thisValue=='None'):
-	         row_data.append(dict (v=0) )
+                 row_data.append(dict (v=0) )
               else:
-	         row_data.append(dict (v=thisValue) )
+                 row_data.append(dict (v=thisValue) )
            except IndexError:
-	      row_data.append(dict (v=0) )
+              row_data.append(dict (v=0) )
         j+=1
         full_row.append( dict(c=row_date+row_data) )
 
@@ -190,8 +190,8 @@ def renderView(request):
 
       response['Pragma'] = 'no-cache'
       response['Cache-Control'] = 'no-cache'
-      return response
-
+      return response  
+     
     if format == 'raw':
       response = HttpResponse(mimetype='text/plain')
       for series in data:
