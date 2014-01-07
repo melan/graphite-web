@@ -109,6 +109,7 @@ def renderView(request):
       cache.set(dataKey, data, cacheTimeout)
 
     format = requestOptions.get('format')
+    noBlanks = requestOptions.get('noBlanks') #If we want to discard empty rows
     if format == 'csv':
       response = HttpResponse(mimetype='text/csv')
       response['Content-Disposition'] = 'attachment; filename=render.csv'
@@ -163,20 +164,27 @@ def renderView(request):
       while (timeStamp <= series.end):
         row_date = []
         row_data = []
+        row_append = False
         timeStamp=series.start+series.step*j
-        row_date.append( dict(v="Date("+str(timeStamp)+")") ) ##Load the Date value
         for eachSeries in this_series: ##For each of the seperate metric points load the value for this time stamp
            LIST=str(eachSeries).split(',')
            try:
               thisValue=LIST[j]
               if (thisValue=='None'):
-                 row_data.append(dict (v=0) )
+                 if not noBlanks:
+                    row_data.append(dict (v=0) )
+                    row_append = True
               else:
                  row_data.append(dict (v=thisValue) )
+                 row_append = True
            except IndexError:
-              row_data.append(dict (v=0) )
+              if not noBlanks:
+                 row_data.append(dict (v=0) )
+                 row_append = True
         j+=1
-        full_row.append( dict(c=row_date+row_data) )
+        if row_append:
+           row_date.append( dict(v="Date("+str(timeStamp)+")") ) ##Load the Date value
+           full_row.append( dict(c=row_date+row_data) )
 
       series_data.append( dict(cols=col_labels,rows=full_row) )
       return_data=json.dumps(series_data)
@@ -247,7 +255,6 @@ def renderView(request):
   log.rendering('Total rendering time %.6f seconds' % (time() - start))
   return response
 
-
 def parseOptions(request):
   queryParams = request.REQUEST
 
@@ -278,6 +285,8 @@ def parseOptions(request):
       requestOptions['jsonp'] = queryParams['jsonp']
   if 'noCache' in queryParams:
     requestOptions['noCache'] = True
+  if 'noBlanks' in queryParams:
+    requestOptions['noBlanks'] = True
 
   requestOptions['localOnly'] = queryParams.get('local') == '1'
 
