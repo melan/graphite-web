@@ -165,7 +165,7 @@ def renderView(request):
         row_date = []
         row_data = []
         row_append = False
-        timeStamp=series.start+series.step*j
+        timeStamp=(series.start+series.step*j)*1000 #Convert to milli secs
         for eachSeries in this_series: ##For each of the seperate metric points load the value for this time stamp
            LIST=str(eachSeries).split(',')
            try:
