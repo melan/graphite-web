@@ -11,3 +11,4 @@ docs/_build
 .project
 .pydevproject
 storage
+.DS_STORE
