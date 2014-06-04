@@ -1,5 +1,5 @@
 // Global object names
-var MasterTemplate="MT"
+var MasterTemplate="MT-"
 var viewport;
 var contextSelector;
 var contextSelectorFields = [];
