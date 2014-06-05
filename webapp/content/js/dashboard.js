@@ -2568,7 +2568,9 @@ function applyState(state) {
 
   //state.refreshConfig = {enabled, interval}
   var refreshConfig = state.refreshConfig;
-  if (refreshConfig.enabled) {
+  //
+  // W-2256960 - temporatily disable auto-refresh by default  
+  if (refreshConfig.enabled && false) {
     stopTask(refreshTask);
     startTask(refreshTask);
     Ext.getCmp('auto-refresh-button').toggle(true);
