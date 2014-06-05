@@ -296,7 +296,7 @@ function initDashboard () {
   } else { // NAV_BAR_REGION == 'north'
     metricSelectorMode = 'text';
     if ( dashNavigation ) {
-      queryParams = { query: MasterTemplate, format: 'completer' };
+      queryParams = { query: MasterTemplate+'-', format: 'completer' };
     } else {
       queryParams = { query: '', format: 'completer', automatic_variants: (UI_CONFIG.automatic_variants) ? '1' : '0'};
     }
