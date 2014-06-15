@@ -47,7 +47,7 @@ class FindRequest:
   def send(self):
     self.cachedResults = cache.get(self.cacheKey)
 
-    if self.cachedResults:
+    if self.cachedResults != None:
       return
 
     self.connection = HTTPConnectionWithTimeout(self.store.host)
@@ -69,7 +69,7 @@ class FindRequest:
 
 
   def get_results(self):
-    if self.cachedResults:
+    if self.cachedResults != None:
       return self.cachedResults
 
     if not self.connection:
