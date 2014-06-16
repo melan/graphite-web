@@ -210,9 +210,14 @@ CarbonLink = CarbonLinkPool(hosts, settings.CARBONLINK_TIMEOUT)
 
 # Data retrieval API
 def fetchData(requestContext, pathExpr):
-  seriesList = []
-  startTime = requestContext['startTime']
-  endTime = requestContext['endTime']
+  startTime = timestamp(requestContext['startTime'])
+  endTime = timestamp(requestContext['endTime'])
+  # Create a key rounded to nearest minute
+  key = '%s-%d-%d' % (pathExpr, int(startTime/60), int(endTime/60))
+  try:
+    return requestContext['memoizerCache'][key]
+  except KeyError:
+    seriesList = []
 
   if requestContext['localOnly']:
     store = LOCAL_STORE
@@ -221,7 +226,7 @@ def fetchData(requestContext, pathExpr):
 
   for dbFile in store.find(pathExpr):
     log.metric_access(dbFile.metric_path)
-    dbResults = dbFile.fetch( timestamp(startTime), timestamp(endTime) )
+    dbResults = dbFile.fetch(startTime, endTime)
     try:
       cachedResults = CarbonLink.query(dbFile.real_metric)
       results = mergeResults(dbResults, cachedResults)
@@ -238,6 +243,7 @@ def fetchData(requestContext, pathExpr):
     series.pathExpression = pathExpr #hack to pass expressions through to render functions
     seriesList.append(series)
 
+  requestContext['memoizerCache'][key] = seriesList
   return seriesList
 
 

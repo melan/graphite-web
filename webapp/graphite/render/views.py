@@ -49,7 +49,8 @@ def renderView(request):
     'startTime' : requestOptions['startTime'],
     'endTime' : requestOptions['endTime'],
     'localOnly' : requestOptions['localOnly'],
-    'data' : []
+    'data' : [],
+    'memoizerCache' : {}
   }
   data = requestContext['data']
 

@@ -39,7 +39,8 @@ def get_data(request):
         'startTime' : requestOptions['startTime'],
         'endTime' : requestOptions['endTime'],
         'localOnly' : False,
-        'data' : []
+        'data' : [],
+        'memoizerCache' : {}
     }
     target = requestOptions['targets'][0]
     seriesList = evaluateTarget(requestContext, target)
