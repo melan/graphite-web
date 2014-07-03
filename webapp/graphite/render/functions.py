@@ -1314,8 +1314,8 @@ def nPercentile(requestContext, seriesList, n):
       continue  # Skip this series because it is empty.
 
     perc_val = _getPercentile(s_copy, n)
-    if perc_val:
-      name = 'nPercentile(%s, %.1f)' % (n, s_copy.name, perc_val)
+    if perc_val is not None:
+      name = 'nPercentile(%s, %g)' % (s_copy.name, n)
       perc_series = TimeSeries(name, s_copy.start, s_copy.end, s_copy.step, [perc_val] )
       perc_series.pathExpression = name
       results.append(perc_series)
