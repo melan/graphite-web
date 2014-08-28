@@ -7,6 +7,7 @@ Total_Fields=`echo $Git_Top_level_Dir|awk 'BEGIN {FS="/"} ; END{print NF}'`
 ((NF=Total_Fields-1))
 Git_Work_Dir=`echo $Git_Top_level_Dir|cut -d'/' -f1-${NF}`
 Git_Deploy_Dir="${Git_Work_Dir}/deploy"
+mkdir -p ${Git_Deploy_Dir}
 DATE=`date '+%Y%m%d'`
 
 for dir in content graphite
