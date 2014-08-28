@@ -10,6 +10,10 @@ Git_Deploy_Dir="${Git_Work_Dir}/deploy"
 mkdir -p ${Git_Deploy_Dir}
 DATE=`date '+%Y%m%d'`
 
+# Compile all python code first
+python -m compileall graphite
+
+# Now package
 for dir in content graphite
 do
      tar zcf ${Git_Deploy_Dir}/${dir}.deploy.${DATE}.tar.gz ./${dir}
