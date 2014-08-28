@@ -15,6 +15,7 @@ limitations under the License."""
 import socket
 import struct
 import time
+import copy
 from django.conf import settings
 from graphite.logger import log
 from graphite.storage import STORE, LOCAL_STORE
@@ -207,6 +208,8 @@ for host in settings.CARBONLINK_HOSTS:
 #A shared importable singleton
 CarbonLink = CarbonLinkPool(hosts, settings.CARBONLINK_TIMEOUT)
 
+def __deepCopy(seriesList):
+    return copy.deepcopy(seriesList) if seriesList else seriesList
 
 # Data retrieval API
 def fetchData(requestContext, pathExpr):
@@ -215,7 +218,7 @@ def fetchData(requestContext, pathExpr):
   # Create a key rounded to nearest minute
   key = '%s-%d-%d' % (pathExpr, int(startTime/60), int(endTime/60))
   try:
-    return requestContext['memoizerCache'][key]
+    return __deepCopy(requestContext['memoizerCache'][key])
   except KeyError:
     seriesList = []
 
@@ -244,7 +247,7 @@ def fetchData(requestContext, pathExpr):
     seriesList.append(series)
 
   requestContext['memoizerCache'][key] = seriesList
-  return seriesList
+  return __deepCopy(seriesList)
 
 
 def mergeResults(dbResults, cacheResults):
