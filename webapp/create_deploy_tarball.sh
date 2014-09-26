@@ -11,7 +11,7 @@ mkdir -p ${Git_Deploy_Dir}
 DATE=`date '+%Y%m%d'`
 
 # Compile all python code first
-python -m compileall graphite
+/usr/bin/python2.6 -m compileall graphite
 
 # Now package
 for dir in content graphite
