@@ -29,6 +29,7 @@ var requestParams = getQueryParams(self.location.search);
 var tokenDelimiter = ':';
 var nodeSelect = 's';
 var nodeToggle = 't';
+var lockTimeRange = false;
 
 /* If there is dashname remove that with a redirect to #name */
 if (requestParams.dashname != undefined) {
@@ -143,13 +144,9 @@ var originalDefaultGraphParams = {
   width: UI_CONFIG.default_graph_width,
   height: UI_CONFIG.default_graph_height
 };
-var defaultGraphParams;
-//XXX
 // Per-session default graph params
-var sessionDefaultParamsJson = cookieProvider.get('defaultGraphParams');
-if (sessionDefaultParamsJson && sessionDefaultParamsJson.length > 0) {
-  defaultGraphParams = Ext.decode(sessionDefaultParamsJson);
-} else {
+defaultGraphParams = restoreDefaultGraphParams();
+if (!defaultGraphParams) {
   defaultGraphParams = Ext.apply({}, originalDefaultGraphParams);
 }
 
@@ -633,6 +630,22 @@ function initDashboard () {
     handler: doShare
   };
 
+  var lockTimeRangeButton = {
+    xtype: 'button',
+    id: 'lock-time-range-button',
+    text: "Lock-Time-Range",
+    enableToggle: true,
+    pressed: false,
+    tooltip: "Toggle lock-time-range",
+    toggleHandler: function (button, pressed) {
+                     if (pressed) {
+                       setLockTimeRange(true);
+                     } else {
+                       setLockTimeRange(false);
+                     }
+                   }
+  };
+  
   var helpButton = {
     icon: HELP_ICON,
     tooltip: "Keyboard Shortcuts",
@@ -724,6 +737,7 @@ function initDashboard () {
         '-',
         shareButton,
         '-',
+        lockTimeRangeButton,
         relativeTimeRange,
         absoluteTimeRange,
         ' ',
@@ -763,7 +777,7 @@ function initDashboard () {
 
   if(window.location.hash != '')
   {
-    navToHash(window.location.hash.substr(1));
+    navToHash(window.location.hash.substr(1), true);
   }
 
   if (initialError) {
@@ -784,7 +798,9 @@ function navToHash(token) {
     var dashName = (index < 0) ? token : token.substring(0, index);
     var treeNodeIdOp = (index < 0) ? null : token.substring(index+1).split(tokenDelimiter);
     
-    if (dashName) goToDashboard(dashName);
+    if (dashName && dashName != dashboardName) {
+      goToDashboard(dashName);
+    }
     if (treeNodeIdOp !== null) {
       var tree = Ext.getCmp(treeNodeIdOp[0]);
       if (tree) {
@@ -805,6 +821,29 @@ function navToHash(token) {
     // This is the initial default state.  Necessary if you navigate starting from the
     // page without any existing history token params and go back to the start state.
     //
+  }
+}
+
+function setLockTimeRange(lockRange) {
+  if (lockRange != lockTimeRange) {
+      lockTimeRange = lockRange;
+      if (lockTimeRange) {
+        // set time and persist
+        persistTimeToDefaultGraphParams(timeRangeForUrl());
+      } else {
+        // remove time from persited state
+        delete defaultGraphParams.from;
+        delete defaultGraphParams.until;
+        saveDefaultGraphParams();
+      }
+  }
+}
+
+function persistTimeToDefaultGraphParams(timeParam) {
+  if (lockTimeRange) {
+    defaultGraphParams.from = timeParam.fromParam;
+    defaultGraphParams.until = timeParam.untilParam;
+    saveDefaultGraphParams();
   }
 }
   
@@ -1096,19 +1135,24 @@ function importGraphUrl(targetUrl, options) {
   }
 }
 
+function createGraphParams(origParams) {
+  var params = {};
+  Ext.apply(params, defaultGraphParams);
+  Ext.apply(params, origParams);
+  Ext.apply(params, GraphSize);
+  params._uniq = Math.random();
+  if (params.title === undefined && params.target.length == 1) {
+    params.title = params.target[0];
+  }
+  if (!params.uniq === undefined) {
+      delete params["uniq"];
+  }
+  return params;
+}
+
 function updateGraphRecords() {
   graphStore.each(function (item, index) {
-    var params = {};
-    Ext.apply(params, defaultGraphParams);
-    Ext.apply(params, item.data.params);
-    Ext.apply(params, GraphSize);
-    params._uniq = Math.random();
-    if (params.title === undefined && params.target.length == 1) {
-      params.title = params.target[0];
-    }
-    if (!params.uniq === undefined) {
-        delete params["uniq"];
-    }
+    var params = createGraphParams(item.data.params);
     item.set('url', '/render?' + Ext.urlEncode(params));
     item.set('width', GraphSize.width);
     item.set('height', GraphSize.height);
@@ -1116,8 +1160,11 @@ function updateGraphRecords() {
   });
 }
 
-function refreshGraphs() {
-  updateGraphRecords();
+function refreshGraphs(skipUpdate) {
+  skip = skipUpdate || false;
+  if (!skip) {
+      updateGraphRecords();
+  }
   graphView.refresh();
   graphArea.getTopToolbar().get('last-refreshed-text').setText( (new Date()).format('g:i:s A') );
 }
@@ -1174,7 +1221,7 @@ function startTask(task) {
 }
 
 /* Time Range management */
-defaultGraphParams['from'].match(/([0-9]+)([^0-9]+)/);
+//defaultGraphParams['from'].match(/([0-9]+)([^0-9]+)/);
 var defaultRelativeQuantity = RegExp.$1;
 var defaultRelativeUnits = RegExp.$2;
 var TimeRange = {
@@ -1216,7 +1263,7 @@ function getQueryParams(qs) {
 
 function updateTimeText(timeParam) {
   graphArea.getTopToolbar().get('time-range-text').setText( getTimeText() );
-  var params = jQuery.extend(requestParams, {"from": timeParam.fromParam, "until": timeParam.untilParam, "dashname": self.location.hash.substr(1)});
+  var params = jQuery.extend({"from": timeParam.fromParam, "until": timeParam.untilParam, "dashname": self.location.hash.substr(1)}, requestParams);
   linkLocation = self.location.protocol + "//" + self.location.host + self.location.pathname + "?" + jQuery.param(params);
 }
 
@@ -1238,9 +1285,7 @@ function timeRangeForUrl() {
 
 function timeRangeUpdated() {
   var timeParam = timeRangeForUrl();
-  defaultGraphParams.from = timeParam.fromParam;
-  defaultGraphParams.until = timeParam.untilParam;
-  saveDefaultGraphParams();
+  persistTimeToDefaultGraphParams(timeParam);
 
   graphStore.each(function () {
     this.data.params.from = timeParam.fromParam;
@@ -2508,63 +2553,6 @@ function dateFromRelative(quantity, units)
 function applyState(state) {
 
   setDashboardName(state.name);
-  
-  // If we have URL parameters use that to reset state
-  var isTimeFromQuery;
-  if (Object.getOwnPropertyNames(requestParams).length > 0) {
-    for (var property in requestParams) {
-      if (requestParams.hasOwnProperty(property)) {
-        state.defaultGraphParams[property] = requestParams[property]
-      }
-    }
-    saveDefaultGraphParams();
-
-    // We have a time monkey with it here
-    if (requestParams.from != undefined) {
-  	  var timeParam = {fromParam: state.defaultGraphParams.from, untilParam: state.defaultGraphParams.until};
-  	  // Update all graphs with new time range
-  	  state.graphs.map(function (item) {
-  	    item[1].from = timeParam.fromParam;
-  	    item[1].until = timeParam.untilParam;
-  	  })
-  	    
-  	  // Setup timeConfig here
-  	  var timeConfig = new Object();
-  	  if (timeParam.fromParam.charAt(0) == '-') {
-  	    timeConfig.type = "relative";
-  	    var fromQuantityUnit = timeParam.fromParam.split(/(\d+)/);
-  	    timeConfig.quantity = fromQuantityUnit[1];
-  	    timeConfig.units = fromQuantityUnit[2];
-  	    if (timeParam.untilParam == 'now' || timeParam.untilParam == '-' || timeParam.untilParam == '') {
-  	      timeConfig.untilUnits = 'now'
-  	    } else {
-  	      var untilQuantityUnit = timeParam.untilParam.split(/(\d+)/);
-  	      timeConfig.untilQuantity = untilQuantityUnit[1];
-          timeConfig.untilUnits = untilQuantityUnit[2];
-  	    }
-  	  } else {
-  	    timeConfig.type = "absolute";
-  	    timeConfig.startDate = Date.parseDate(timeParam.fromParam.replace('_', ' '), HM_format + ' ' + YMD_format);
-  	    timeConfig.startTime = timeConfig.startDate.format(HM_display_format);
-        timeConfig.endDate = Date.parseDate(timeParam.untilParam.replace('_', ' '), HM_format + ' ' + YMD_format);
-        timeConfig.endTime = timeConfig.endDate.format(HM_display_format);
-      }
-  	  state.timeConfig = timeConfig;
-    }
-  }
-
-  //state.timeConfig = {type, quantity, units, untilQuantity, untilUnits, startDate, startTime, endDate, endTime}
-  var timeConfig = state.timeConfig
-  TimeRange.type = timeConfig.type;
-  TimeRange.quantity = timeConfig.quantity;
-  TimeRange.units = timeConfig.units;
-  TimeRange.untilQuantity = timeConfig.untilQuantity;
-  TimeRange.untilUnits = timeConfig.untilUnits;
-  TimeRange.startDate = new Date(timeConfig.startDate);
-  TimeRange.startTime = timeConfig.startTime;
-  TimeRange.endDate = new Date(timeConfig.endDate);
-  TimeRange.endTime = timeConfig.endTime;
-  updateTimeText(timeRangeForUrl());
 
   //state.refreshConfig = {enabled, interval}
   var refreshConfig = state.refreshConfig;
@@ -2587,12 +2575,66 @@ function applyState(state) {
   GraphSize.height = graphSize.height;
 
   //state.defaultGraphParams = {...}
-  defaultGraphParams = state.defaultGraphParams || originalDefaultGraphParams;
+  defaultGraphParams = (lockTimeRange) ? restoreDefaultGraphParams() : state.defaultGraphParams || originalDefaultGraphParams;
+
+  // If we have URL parameters use that to reset state
+  if (Object.getOwnPropertyNames(requestParams).length > 0) {
+    for (var property in requestParams) {
+      if (requestParams.hasOwnProperty(property)) {
+        defaultGraphParams[property] = requestParams[property]
+      }
+    }
+    saveDefaultGraphParams();
+  }
+
+  // Calculate the timeConfig values
+  var timeParam = {fromParam: defaultGraphParams.from, untilParam: defaultGraphParams.until};
+  state.timeConfig = timeParamToTimeConfig(timeParam);
+
+  //state.timeConfig = {type, quantity, units, untilQuantity, untilUnits, startDate, startTime, endDate, endTime}
+  var timeConfig = state.timeConfig
+  TimeRange.type = timeConfig.type;
+  TimeRange.quantity = timeConfig.quantity;
+  TimeRange.units = timeConfig.units;
+  TimeRange.untilQuantity = timeConfig.untilQuantity;
+  TimeRange.untilUnits = timeConfig.untilUnits;
+  TimeRange.startDate = new Date(timeConfig.startDate);
+  TimeRange.startTime = timeConfig.startTime;
+  TimeRange.endDate = new Date(timeConfig.endDate);
+  TimeRange.endTime = timeConfig.endTime;
+  updateTimeText(timeRangeForUrl());
 
   //state.graphs = [ [id, target, params, url], ... ]
+  state.graphs.map(function (item) {
+    item[2] = '/render?' + Ext.urlEncode(createGraphParams(item[1]));
+  })
   graphStore.loadData(state.graphs);
 
-  refreshGraphs();
+  refreshGraphs(true);
+}
+
+function timeParamToTimeConfig(timeParam) {
+  var timeConfig = new Object();
+  if (timeParam.fromParam.charAt(0) == '-') {
+    timeConfig.type = "relative";
+    var fromQuantityUnit = timeParam.fromParam.split(/(\d+)/);
+    timeConfig.quantity = fromQuantityUnit[1];
+    timeConfig.units = fromQuantityUnit[2];
+    if (timeParam.untilParam == 'now' || timeParam.untilParam == '-' || timeParam.untilParam == '') {
+      timeConfig.untilUnits = 'now'
+    } else {
+      var untilQuantityUnit = timeParam.untilParam.split(/(\d+)/);
+      timeConfig.untilQuantity = untilQuantityUnit[1];
+      timeConfig.untilUnits = untilQuantityUnit[2];
+    }
+  } else {
+    timeConfig.type = "absolute";
+    timeConfig.startDate = Date.parseDate(timeParam.fromParam.replace('_', ' '), HM_format + ' ' + YMD_format);
+    timeConfig.startTime = timeConfig.startDate.format(HM_display_format);
+    timeConfig.endDate = Date.parseDate(timeParam.untilParam.replace('_', ' '), HM_format + ' ' + YMD_format);
+    timeConfig.endTime = timeConfig.endDate.format(HM_display_format);
+  }
+  return timeConfig;
 }
 
 function deleteDashboard(name) {
@@ -3020,6 +3062,14 @@ function saveDefaultGraphParams() {
   cookieProvider.set('defaultGraphParams', Ext.encode(defaultGraphParams));
 }
 
+function restoreDefaultGraphParams() {
+  var sessionDefaultParamsJson = cookieProvider.get('defaultGraphParams');
+  if (sessionDefaultParamsJson && sessionDefaultParamsJson.length > 0) {
+    return Ext.decode(sessionDefaultParamsJson);
+  } else {
+    return null;
+  }
+}
 
 /* Cookie stuff */
 function getContextFieldCookie(field) {

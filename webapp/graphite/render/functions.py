@@ -1316,7 +1316,8 @@ def nPercentile(requestContext, seriesList, n):
     perc_val = _getPercentile(s_copy, n)
     if perc_val is not None:
       name = 'nPercentile(%s, %g)' % (s_copy.name, n)
-      perc_series = TimeSeries(name, s_copy.start, s_copy.end, s_copy.step, [perc_val] )
+      point_count = int((s.end - s.start)/s.step)
+      perc_series = TimeSeries(name, s_copy.start, s_copy.end, s_copy.step, [perc_val] * point_count)
       perc_series.pathExpression = name
       results.append(perc_series)
   return results
