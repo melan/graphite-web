@@ -1150,10 +1150,13 @@ function createGraphParams(origParams) {
   return params;
 }
 
-function updateGraphRecords() {
+function updateGraphRecords(skipUpdate) {
+  skip = skipUpdate || false;
   graphStore.each(function (item, index) {
-    var params = createGraphParams(item.data.params);
-    item.set('url', '/render?' + Ext.urlEncode(params));
+    if (!skip) {
+      var params = createGraphParams(item.data.params);
+      item.set('url', '/render?' + Ext.urlEncode(params));
+    }
     item.set('width', GraphSize.width);
     item.set('height', GraphSize.height);
     item.set('index', index);
@@ -1162,9 +1165,7 @@ function updateGraphRecords() {
 
 function refreshGraphs(skipUpdate) {
   skip = skipUpdate || false;
-  if (!skip) {
-      updateGraphRecords();
-  }
+  updateGraphRecords(skip);
   graphView.refresh();
   graphArea.getTopToolbar().get('last-refreshed-text').setText( (new Date()).format('g:i:s A') );
 }
