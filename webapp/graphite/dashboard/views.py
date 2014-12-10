@@ -8,6 +8,7 @@ from django.shortcuts import render_to_response
 from django.http import HttpResponse, QueryDict, HttpResponseBadRequest
 from django.conf import settings
 from graphite.util import json
+from django.utils.safestring import mark_safe
 from graphite.dashboard.models import Dashboard
 from graphite.metrics.views import tree_json
 from graphite.render.views import renderView
@@ -123,14 +124,14 @@ def dashboard(request, name=None):
     theme = config.ui_config['theme']
 
   context = {
-    'schemes_json' : json.dumps(config.schemes),
-    'ui_config_json' : json.dumps(config.ui_config),
-    'jsdebug' : debug or settings.JAVASCRIPT_DEBUG,
-    'debug' : debug,
-    'theme' : theme,
-    'initialError' : initialError,
-    'querystring' : json.dumps( dict( request.GET.items() ) ),
-    'dashboard_conf_missing' : dashboard_conf_missing,
+    'schemes_json': mark_safe(json.dumps(config.schemes)),
+    'ui_config_json': mark_safe(json.dumps(config.ui_config)),
+    'jsdebug': debug or settings.JAVASCRIPT_DEBUG,
+    'debug': debug,
+    'theme': theme,
+    'initialError': initialError,
+    'querystring': mark_safe(json.dumps(dict(request.GET.items()))),
+    'dashboard_conf_missing': dashboard_conf_missing,
   }
 
   if name is not None:
