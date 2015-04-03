@@ -2,41 +2,57 @@ import time
 import subprocess
 import os.path
 from django.conf import settings
+import re
 from graphite.logger import log
 from graphite.storage import is_pattern, match_entries
 
 
 class IndexSearcher:
-  def __init__(self, index_path):
-    self.index_path = index_path
-    if not os.path.exists(index_path):
-      open(index_path, 'w').close() # touch the file to prevent re-entry down this code path
-      build_index_path = os.path.join(settings.GRAPHITE_ROOT, "bin/build-index.sh")
-      retcode = subprocess.call(build_index_path)
-      if retcode != 0:
-        log.exception("Couldn't build index file %s" % index_path)
-        raise RuntimeError("Couldn't build index file %s" % index_path)
-    self.last_mtime = 0
-    self._tree = (None, {}) # (data, children)
-    log.info("[IndexSearcher] performing initial index load")
-    self.reload()
+  def __init__(self, index_dir):
+    self.index_dir = index_dir
+    self._last_mtimes = {}
+    self._trees = {}
 
-  @property
-  def tree(self):
-    current_mtime = os.path.getmtime(self.index_path)
-    if current_mtime > self.last_mtime:
-      log.info("[IndexSearcher] reloading stale index, current_mtime=%s last_mtime=%s" %
-               (current_mtime, self.last_mtime))
-      self.reload()
+    for folder in settings.DATA_DIRS:
+      index_file_name, index_path = self._index_file_name(folder)
 
-    return self._tree
+      if not os.path.exists(index_path):
+        open(index_path, 'w').close() # touch the file to prevent re-entry down this code path
+        build_index_path = os.path.join(settings.GRAPHITE_BIN, "build-index.sh")
+        retcode = subprocess.call([build_index_path, folder, index_path])
+        if retcode != 0:
+          log.exception("Couldn't build index file %s for %s" % (index_path, folder))
+          raise RuntimeError("Couldn't build index file %s for %s" % (index_path, folder))
+      self._last_mtimes[index_file_name] = 0
+      self._trees[index_file_name] = (None, {}) # (data, children)
+      log.info("[IndexSearcher] performing initial index load for %s" % folder)
+      self.reload(folder)
 
-  def reload(self):
-    log.info("[IndexSearcher] reading index data from %s" % self.index_path)
+  def _index_file_name(self, whisper_folder):
+    index_file_name = (whisper_folder[1:] if whisper_folder[0] == os.sep else whisper_folder).replace(os.sep, ".")
+    index_path = os.path.join(self.index_dir, index_file_name)
+
+    return index_file_name, index_path
+
+  def tree(self, folder):
+    index_file_name, index_path = self._index_file_name(folder)
+
+    current_mtime = os.path.getmtime(index_path)
+    if current_mtime > self._last_mtimes[index_file_name]:
+      log.info("[IndexSearcher] reloading stale index %s for %s, current_mtime=%s last_mtime=%s" %
+               (index_path, folder, current_mtime, self._last_mtimes[index_file_name]))
+      self.reload(folder)
+
+    return self._trees[index_file_name]
+
+  def reload(self, folder):
+    index_file_name, index_path = self._index_file_name(folder)
+
+    log.info("[IndexSearcher] reading index data from %s for %s" % (index_path, folder))
     t = time.time()
     total_entries = 0
     tree = (None, {}) # (data, children)
-    for line in open(self.index_path):
+    for line in open(index_path):
       line = line.strip()
       if not line:
         continue
@@ -54,26 +70,28 @@ class IndexSearcher:
       cursor[1][leaf] = (line, {})
       total_entries += 1
 
-    self._tree = tree
-    self.last_mtime = os.path.getmtime(self.index_path)
-    log.info("[IndexSearcher] index reload took %.6f seconds (%d entries)" % (time.time() - t, total_entries))
+    self._trees[index_file_name] = tree
+    self._last_mtimes[index_file_name] = os.path.getmtime(index_path)
+    log.info("[IndexSearcher] index %s for %s reload took %.6f seconds (%d entries)" %
+             (index_file_name, folder, time.time() - t, total_entries))
 
   def search(self, query, max_results=None, keep_query_pattern=False):
     query_parts = query.split('.')
     metrics_found = set()
-    for result in self.subtree_query(self.tree, query_parts):
-      # Overlay the query pattern on the resulting paths
-      if keep_query_pattern:
-        path_parts = result['path'].split('.')
-        result['path'] = '.'.join(query_parts) + result['path'][len(query_parts):]
+    for folder in settings.DATA_DIRS:
+      for result in self.subtree_query(self.tree(folder), query_parts):
+        # Overlay the query pattern on the resulting paths
+        if keep_query_pattern:
+          path_parts = result['path'].split('.')
+          result['path'] = '.'.join(query_parts) + result['path'][len(query_parts):]
 
-      if result['path'] in metrics_found:
-        continue
-      yield result
+        if result['path'] in metrics_found:
+          continue
+        yield result
 
-      metrics_found.add(result['path'])
-      if max_results is not None and len(metrics_found) >= max_results:
-        return
+        metrics_found.add(result['path'])
+        if max_results is not None and len(metrics_found) >= max_results:
+          return
 
   def subtree_query(self, root, query_parts):
     if query_parts:
@@ -101,9 +119,34 @@ class IndexSearcher:
         for result in self.subtree_query(child_node, query_parts[1:]):
           yield result
 
+  def search_by_patterns(self, patterns, limit=100):
+    regexes = [re.compile(p,re.I) for p in patterns]
+    def matches(s):
+      for regex in regexes:
+        if regex.search(s):
+          return True
+      return False
+
+    results = []
+
+    for folder in settings.DATA_DIRS:
+      index_file_name, index_path = self._index_file_name(folder)
+      index_file = open(index_path)
+      for line in index_file:
+        if matches(line):
+          results.append( line.strip() )
+        if len(results) >= limit:
+          break
+
+      index_file.close()
+
+      if len(results) >= limit:
+        break
+
+    return results
 
 class SearchIndexCorrupt(StandardError):
   pass
 
 
-searcher = IndexSearcher(settings.INDEX_FILE)
+searcher = IndexSearcher(settings.INDEX_DIR)

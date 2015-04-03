@@ -1,15 +1,15 @@
-import re
-
 from django.shortcuts import render_to_response
 from django.http import HttpResponse, Http404, HttpResponseBadRequest
 from django.conf import settings
+from django.core.urlresolvers import get_script_prefix
 
-from graphite.util import json
+from graphite.account.models import Profile
+from graphite.logger import log
+from graphite.metrics.search import searcher
+from graphite.util import json, getProfile, defaultUser, getProfileByUsername
 from graphite.render.views import parseOptions
 from graphite.render.evaluator import evaluateTarget
 from graphite.storage import STORE
-from django.core.urlresolvers import get_script_prefix
-
 
 
 def graphlot_render(request):
@@ -101,23 +101,7 @@ def search(request):
     return HttpResponse("")
 
   patterns = query.split()
-  regexes = [re.compile(p,re.I) for p in patterns]
-  def matches(s):
-    for regex in regexes:
-      if regex.search(s):
-        return True
-    return False
-
-  results = []
-
-  index_file = open(settings.INDEX_FILE)
-  for line in index_file:
-    if matches(line):
-      results.append( line.strip() )
-    if len(results) >= 100:
-      break
-
-  index_file.close()
+  results = searcher.search_by_patterns(patterns, 100)
   result_string = ','.join(results)
   return HttpResponse(result_string, mimetype='text/plain')
 

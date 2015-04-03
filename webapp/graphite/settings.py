@@ -31,7 +31,6 @@ JAVASCRIPT_DEBUG = False
 WEB_DIR = dirname( abspath(__file__) )
 WEBAPP_DIR = dirname(WEB_DIR)
 GRAPHITE_ROOT = dirname(WEBAPP_DIR)
-THIRDPARTY_DIR = join(WEB_DIR,'thirdparty')
 # Initialize additional path variables
 # Defaults for these are set after local_settings is imported
 CONTENT_DIR = '/usr/share/graphite/webapp/content/'
@@ -41,7 +40,7 @@ DASHBOARD_CONF = ''
 GRAPHTEMPLATES_CONF = ''
 STORAGE_DIR = '/var/lib/graphite-web/'
 WHITELIST_FILE = ''
-INDEX_FILE = ''
+INDEX_DIR = ''
 LOG_DIR = '/var/log/graphite-web/'
 CARBON_DIR = '/var/lib/carbon/'
 WHISPER_DIR = CARBON_DIR + 'whisper/'
@@ -51,8 +50,6 @@ DATA_DIRS = []
 CLUSTER_SERVERS = []
 
 sys.path.insert(0, WEBAPP_DIR)
-# Allow local versions of the libs shipped in thirdparty to take precedence
-sys.path.append(THIRDPARTY_DIR)
 
 # Memcache settings
 MEMCACHE_HOSTS = []
@@ -117,6 +114,11 @@ except ImportError:
 if not _APP_SETTINGS_LOADED:
   from graphite.app_settings import *
 
+if not SECRET_KEY:
+  import graphite.local_settings
+  if graphite.local_settings.SECRET_KEY:
+    SECRET_KEY = graphite.local_settings.SECRET_KEY
+
 ## Set config dependent on flags set in local_settings
 # Path configuration
 if not CONTENT_DIR:
@@ -135,8 +137,8 @@ if not STORAGE_DIR:
   STORAGE_DIR = os.environ.get('GRAPHITE_STORAGE_DIR', join(GRAPHITE_ROOT, 'storage'))
 if not WHITELIST_FILE:
   WHITELIST_FILE = join(STORAGE_DIR, 'lists', 'whitelist')
-if not INDEX_FILE:
-  INDEX_FILE = join(STORAGE_DIR, 'index')
+if not INDEX_DIR:
+  INDEX_DIR = join(STORAGE_DIR, 'index')
 if not LOG_DIR:
   LOG_DIR = join(STORAGE_DIR, 'log', 'webapp')
 if not WHISPER_DIR:

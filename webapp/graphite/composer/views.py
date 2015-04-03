@@ -39,7 +39,7 @@ def composer(request):
     'user' : request.user,
     'profile' : profile,
     'showMyGraphs' : int( profile.user.username != 'default' ),
-    'searchEnabled' : int( os.access(settings.INDEX_FILE, os.R_OK) ),
+    'searchEnabled' : int( os.access(settings.INDEX_DIR, os.R_OK) ),
     'debug' : settings.DEBUG,
     'jsdebug' : settings.DEBUG,
   }

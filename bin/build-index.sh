@@ -1,17 +1,12 @@
 #!/bin/bash
 
-if [ "$GRAPHITE_ROOT" = "" ]
-then
-  GRAPHITE_ROOT="/opt/graphite"
+if [[ -z "$1" || -z "$2" ]]; then
+  echo "Usage: $0 <WHISPER_DIR> <INDEX_FILE>"
+  exit 1
 fi
 
-if [ "$GRAPHITE_STORAGE_DIR" = "" ]
-then
-  GRAPHITE_STORAGE_DIR="${GRAPHITE_ROOT}/storage"
-fi
-
-
-WHISPER_DIR="${GRAPHITE_STORAGE_DIR}/whisper"
+WHISPER_DIR="$1"
+INDEX_FILE="$2"
 
 if [ ! -d "$WHISPER_DIR" ]
 then
@@ -19,13 +14,13 @@ then
   exit 1
 fi
 
-INDEX_FILE="${GRAPHITE_STORAGE_DIR}/index"
-TMP_INDEX="${GRAPHITE_STORAGE_DIR}/.index.tmp"
+TMP_INDEX="${INDEX_FILE}.tmp"
 
 rm -f $TMP_INDEX
 cd $WHISPER_DIR
 touch $INDEX_FILE
 echo "[`date`]  building index..."
-find -L . -name '*.wsp' | perl -pe 's!^[^/]+/(.+)\.wsp$!$1!; s!/!.!g' > $TMP_INDEX
+find -L . -name '*.wsp'    | perl -pe 's!^[^/]+/(.+)\.wsp$!$1!; s!/!.!g' > $TMP_INDEX
+find -L . -name '*.wsp.gz' | perl -pe 's!^[^/]+/(.+)\.wsp$!$1!; s!/!.!g' >> $TMP_INDEX
 echo "[`date`]  complete, switching to new index file"
 mv -f $TMP_INDEX $INDEX_FILE

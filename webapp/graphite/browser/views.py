@@ -12,14 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License."""
 
-import re
 from django.shortcuts import render_to_response
 from django.http import HttpResponse
 from django.conf import settings
 from django.utils.safestring import mark_safe
+
 from graphite.account.models import Profile
 from graphite.util import getProfile, getProfileByUsername, defaultUser, json
 from graphite.logger import log
+from graphite.metrics.search import searcher
+
+
 try:
   from hashlib import md5
 except ImportError:
@@ -60,23 +63,7 @@ def search(request):
     return HttpResponse("")
 
   patterns = query.split()
-  regexes = [re.compile(p,re.I) for p in patterns]
-  def matches(s):
-    for regex in regexes:
-      if regex.search(s):
-        return True
-    return False
-
-  results = []
-
-  index_file = open(settings.INDEX_FILE)
-  for line in index_file:
-    if matches(line):
-      results.append( line.strip() )
-    if len(results) >= 100:
-      break
-
-  index_file.close()
+  results = searcher.search_by_patterns(patterns, 100)
   result_string = ','.join(results)
   return HttpResponse(result_string, mimetype='text/plain')
 
